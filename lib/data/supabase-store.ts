@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { CollectionName, Collections, SettingKey, SiteSettingsMap } from "@/types/content";
-import { DEFAULT_SETTINGS } from "@/data/seed";
+import { DEFAULT_SETTINGS, buildSeed } from "@/data/seed";
 import type { DataStore, MediaStorage, StoredFile } from "./types";
 
 /**
@@ -36,18 +36,44 @@ function fail(error: { message: string } | null, what: string) {
   if (error) throw new Error(`Supabase ${what}: ${error.message}`);
 }
 
+// insertion order respects foreign keys
+const SEED_ORDER = ["pages", "page_sections", "brands", "products", "wilayas", "social_links", "media_library", "seo_entries", "marketing_pixels"] as const;
+let seeding: Promise<void> | null = null;
+
+/** Loads the starter content into an empty project on first use (safe to race: duplicates are ignored). */
+function ensureSeeded(db: SupabaseClient) {
+  seeding ??= (async () => {
+    const { count, error } = await db.from("pages").select("id", { count: "exact", head: true });
+    fail(error, "check seed");
+    if (count) return;
+    const seed = buildSeed();
+    for (const table of SEED_ORDER) {
+      const rows = seed.collections[table] as unknown[];
+      if (!rows.length) continue;
+      const res = await db.from(table).upsert(rows as never, { onConflict: "id", ignoreDuplicates: true });
+      fail(res.error, `seed ${table}`);
+    }
+  })().catch((e) => {
+    seeding = null;
+    throw e;
+  });
+  return seeding;
+}
+
 export class SupabaseStore implements DataStore {
   readonly kind = "supabase" as const;
   readonly ephemeral = false;
   private db = serviceClient();
 
   async list<K extends CollectionName>(c: K): Promise<Collections[K][]> {
+    await ensureSeeded(this.db);
     const o = ORDER[c] ?? { column: "sort_order", ascending: true };
     const { data, error } = await this.db.from(c).select("*").order(o.column, { ascending: o.ascending });
     fail(error, `list ${c}`);
     return (data ?? []) as Collections[K][];
   }
   async get<K extends CollectionName>(c: K, id: string) {
+    await ensureSeeded(this.db);
     const { data, error } = await this.db.from(c).select("*").eq("id", id).maybeSingle();
     fail(error, `get ${c}`);
     return (data as Collections[K]) ?? null;

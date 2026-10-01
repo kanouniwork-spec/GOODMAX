@@ -8,6 +8,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { Profile } from "@/types/content";
 import { backend, db } from "@/lib/data";
 import { dataDir } from "@/lib/data/file-store";
+import { serviceClient } from "@/lib/data/supabase-store";
 import { verifyPassword } from "./password";
 import { can, type Permission } from "./permissions";
 
@@ -68,13 +69,40 @@ async function supabaseAuth() {
   });
 }
 
+/**
+ * First sign-in on a fresh Supabase project: while no profiles exist, the
+ * ADMIN_BOOTSTRAP_EMAIL / ADMIN_BOOTSTRAP_PASSWORD pair creates the first admin.
+ */
+async function bootstrapSupabaseAdmin(email: string, password: string) {
+  const want = (process.env.ADMIN_BOOTSTRAP_EMAIL || "").trim().toLowerCase();
+  const pass = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";
+  if (!want || !pass || email !== want || password !== pass) return false;
+  if ((await db().list("profiles")).length) return false;
+  const admin = serviceClient().auth.admin;
+  const { data, error } = await admin.createUser({ email, password, email_confirm: true });
+  let id = data?.user?.id;
+  if (error) {
+    if (!/already/i.test(error.message)) return false;
+    const existing = (await admin.listUsers()).data.users.find((u) => u.email?.toLowerCase() === email);
+    if (!existing) return false;
+    await admin.updateUserById(existing.id, { password });
+    id = existing.id;
+  }
+  if (!id) return false;
+  await db().insert("profiles", { id, email, full_name: "Administrator", role: "admin", active: true, created_at: new Date().toISOString() } as Profile);
+  return true;
+}
+
 /* ---------------- public API ---------------- */
 
 export async function signIn(email: string, password: string): Promise<{ ok: true } | { ok: false; error: string }> {
   email = email.trim().toLowerCase();
   if (backend() === "supabase") {
     const sb = await supabaseAuth();
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    let { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if ((error || !data.user) && (await bootstrapSupabaseAdmin(email, password))) {
+      ({ data, error } = await sb.auth.signInWithPassword({ email, password }));
+    }
     if (error || !data.user) return { ok: false, error: "invalid" };
     const profile = await db().get("profiles", data.user.id);
     if (!profile?.active) {

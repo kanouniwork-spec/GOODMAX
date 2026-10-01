@@ -5,12 +5,6 @@
 
 create extension if not exists pgcrypto;
 
--- ---------- helpers ----------
-create or replace function public.app_role() returns text
-language sql stable security definer set search_path = public as $$
-  select role from public.profiles where id = auth.uid()::text and active
-$$;
-
 -- ---------- tables ----------
 create table if not exists public.profiles (
   id text primary key,                       -- = auth.users.id
@@ -201,6 +195,12 @@ create table if not exists public.audit_log (
   entity_id text not null,
   created_at timestamptz not null default now()
 );
+
+-- ---------- helpers (after profiles exists) ----------
+create or replace function public.app_role() returns text
+language sql stable security definer set search_path = public as $$
+  select role from public.profiles where id = auth.uid()::text and active
+$$;
 
 -- ---------- row level security ----------
 do $$
