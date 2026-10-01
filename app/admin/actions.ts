@@ -496,7 +496,7 @@ export async function draftTranslation(text: string, from: Locale, to: Locale): 
     const key = process.env.ANTHROPIC_API_KEY;
     if (!key) throw new Error("Automatic drafts need ANTHROPIC_API_KEY in the environment.");
     if (!text.trim()) throw new Error("Nothing to translate");
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(`${process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"}/v1/messages`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
@@ -514,6 +514,71 @@ export async function draftTranslation(text: string, from: Locale, to: Locale): 
     return ok(out);
   } catch (e) {
     return fail(e);
+  }
+}
+
+export type ProductDraft = {
+  name_json: Record<Locale, string>;
+  short_description_json: Record<Locale, string>;
+  description_json: Record<Locale, string>;
+  alt_json: Record<Locale, string>;
+  features: { title_json: Record<Locale, string>; body_json: Record<Locale, string> }[];
+};
+
+const PRODUCT_DRAFT_PROMPT = `You write product copy for GOODMAX, an Algerian brand of shaving products, from a single product photo.
+Rules:
+- Describe only what is visible in the photo (shape, number of blades you can count, colours, grip texture, parts such as a comfort strip or pivot head). Never invent specifications, materials, certifications, prices or claims you cannot see.
+- If the photo does not show a product clearly, return empty strings.
+- Write natural marketing copy in English, French and Arabic (Modern Standard Arabic). Keep the brand name GOODMAX in Latin letters.
+- name: short product name (max 5 words). short: one sentence. long: 2-3 sentences. alt: a plain description of the photo for screen readers.
+- features: 2 to 4 characteristics visible in the photo, each with a short title and a one-sentence detail.
+Reply with JSON only, no markdown, in exactly this shape:
+{"name":{"en":"","fr":"","ar":""},"short":{"en":"","fr":"","ar":""},"long":{"en":"","fr":"","ar":""},"alt":{"en":"","fr":"","ar":""},"features":[{"title":{"en":"","fr":"","ar":""},"detail":{"en":"","fr":"","ar":""}}]}`;
+
+/** Drafts product name, descriptions and visible characteristics in EN/FR/AR from one photo. */
+export async function draftProductFromImage(imageBase64: string, mediaType: string): Promise<ActionResult<ProductDraft>> {
+  try {
+    await authorize("content.write");
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) throw new Error("AI drafts need ANTHROPIC_API_KEY in the environment.");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(mediaType)) throw new Error("Use a JPEG, PNG or WebP image.");
+    if (!imageBase64 || imageBase64.length > 7_000_000) throw new Error("Image is missing or too large.");
+    const res = await fetch(`${process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
+        max_tokens: 3000,
+        system: PRODUCT_DRAFT_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
+              { type: "text", text: "Write the GOODMAX product copy for this photo." },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!res.ok) throw new Error(`AI service returned ${res.status}`);
+    const json = (await res.json()) as { content?: { type: string; text?: string }[] };
+    const text = json.content?.find((b) => b.type === "text")?.text ?? "";
+    const raw = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
+    type L = Partial<Record<Locale, unknown>>;
+    const parsed = JSON.parse(raw) as { name?: L; short?: L; long?: L; alt?: L; features?: { title?: L; detail?: L }[] };
+    const loc = (o?: L) => Object.fromEntries(LOCALES.map((l) => [l, typeof o?.[l] === "string" ? (o[l] as string).trim().slice(0, 2000) : ""])) as Record<Locale, string>;
+    const draft: ProductDraft = {
+      name_json: loc(parsed.name),
+      short_description_json: loc(parsed.short),
+      description_json: loc(parsed.long),
+      alt_json: loc(parsed.alt),
+      features: (Array.isArray(parsed.features) ? parsed.features : []).slice(0, 6).map((f) => ({ title_json: loc(f.title), body_json: loc(f.detail) })),
+    };
+    if (!draft.name_json.en && !draft.short_description_json.en) throw new Error("The AI could not see a product in this image.");
+    return ok(draft);
+  } catch (e) {
+    return fail(e instanceof SyntaxError ? new Error("The AI reply could not be read. Try again.") : e);
   }
 }
 

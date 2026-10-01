@@ -119,6 +119,7 @@ export function RecordEditor({
   publish,
   previewHref,
   extraTop,
+  topPanel,
   extraPanels,
   transform = (v) => v,
 }: {
@@ -138,6 +139,8 @@ export function RecordEditor({
   };
   previewHref?: string;
   extraTop?: React.ReactNode;
+  /** rendered above the main form, with access to the live form value */
+  topPanel?: (value: Obj, set: (v: Obj) => void) => React.ReactNode;
   extraPanels?: (value: Obj, set: (v: Obj) => void) => React.ReactNode;
   /** maps the form value to the stored shape before saving */
   transform?: (v: Obj) => Obj;
@@ -192,6 +195,7 @@ export function RecordEditor({
       {extraTop}
       <div className="a-split">
         <div>
+          {topPanel?.(value, set)}
           <div className="a-card">
             <FieldsForm fields={fields} value={value} onChange={set} />
           </div>
