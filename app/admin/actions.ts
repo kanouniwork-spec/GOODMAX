@@ -535,14 +535,15 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
   }
   if (geminiKey) {
     const base = process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com";
-    // Vercel stops the function at maxDuration (60s), so every Gemini call shares a 50s budget.
-    const deadline = Date.now() + 50_000;
+    // Vercel stops the function at maxDuration (300s on the product page); all Gemini calls share a 270s budget,
+    // and one slow model is given up after 90s so another one can be tried.
+    const deadline = Date.now() + 270_000;
     let thinkingOff = true;
     const send = (model: string) =>
       fetch(`${base}/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
-        signal: AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
+        signal: AbortSignal.timeout(Math.max(1000, Math.min(90_000, deadline - Date.now()))),
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [...(image ? [{ inline_data: { mime_type: image.mediaType, data: image.base64 } }] : []), { text }] }],
@@ -550,8 +551,10 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
           generationConfig: { maxOutputTokens: maxTokens + 4000, ...(thinkingOff ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
         }),
       }).catch((e: Error) => {
-        if (e.name === "TimeoutError" || e.name === "AbortError") throw new Error("Google's AI took too long. Try again.");
-        throw e;
+        if (e.name !== "TimeoutError" && e.name !== "AbortError") throw e;
+        console.error("Gemini timeout", model);
+        // a fake 504 lets the loop below move on to the next model
+        return new Response("timeout", { status: 504 });
       });
     const call = async (model: string) => {
       let r = await send(model);
@@ -568,7 +571,7 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
     let listed = false;
     let res: Response | undefined;
     let model = "";
-    while (queue.length && deadline - Date.now() > 15_000) {
+    while (queue.length && deadline - Date.now() > 20_000) {
       model = queue.shift()!;
       if (tried.has(model)) continue;
       tried.add(model);
@@ -577,7 +580,7 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
         await new Promise((r) => setTimeout(r, 1500));
         res = await call(model);
       }
-      if (res.ok || res.status === 429 || ![404, 500, 503].includes(res.status)) break;
+      if (res.ok || res.status === 429 || ![404, 500, 503, 504].includes(res.status)) break;
       console.error("Gemini error", res.status, model, (await res.text()).slice(0, 300));
       if (!listed) {
         listed = true;
@@ -587,6 +590,7 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
     if (!res) throw new Error("AI service unavailable");
     if (res.status === 429) throw new Error("The free AI quota is used up for now. Try again later.");
     if (res.status === 503) throw new Error("Google's AI is busy right now. Wait a minute and try again.");
+    if (res.status === 504) throw new Error("Google's AI did not answer in time. Try again in a minute.");
     if (!res.ok) {
       console.error("Gemini error", res.status, model, (await res.text()).slice(0, 500));
       throw new Error(`AI service returned ${res.status}`);

@@ -1,5 +1,5 @@
 // AI drafts from a photo can take a while on the free Gemini tier
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 import { notFound } from "next/navigation";
 import { db } from "@/lib/data";
