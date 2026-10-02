@@ -73,8 +73,9 @@ function AiFromPhoto({ value, set }: { value: Obj; set: (v: Obj) => void }) {
   const [busy, setBusy] = useState(false);
   if (readOnly) return null;
 
-  const generate = async () => {
-    const hasText = Object.values((value.name_json as Obj) ?? {}).some((t) => String(t ?? "").trim());
+  const hasText = Object.values((value.name_json as Obj) ?? {}).some((t) => String(t ?? "").trim());
+
+  const generate = async (photo: string) => {
     if (hasText && !window.confirm("Replace the current name, descriptions and characteristics with the AI draft?")) return;
     setBusy(true);
     try {
@@ -111,16 +112,24 @@ function AiFromPhoto({ value, set }: { value: Obj; set: (v: Obj) => void }) {
     <div className="a-card">
       <h2>Write with AI from a photo</h2>
       <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-        Pick or upload a product photo. AI fills in the name, descriptions and the characteristics it can see, in English, French and Arabic. Nothing is saved until you click Save draft.
+        Upload a product photo. AI reads it and writes the name, description and benefits in English, French and Arabic. Nothing is saved until you click Save draft.
       </p>
-      <MediaField label="Product photo" value={photo} onChange={setPhoto} />
+      <MediaField
+        label="Product photo"
+        value={photo}
+        onChange={setPhoto}
+        onPicked={(url) => {
+          // a new product writes itself as soon as its photo is uploaded
+          if (canTranslate && !hasText && !busy) void generate(url);
+        }}
+      />
       {canTranslate ? (
-        <button type="button" className="a-btn a-btn--primary" style={{ marginTop: 10 }} onClick={generate} disabled={busy || !photo}>
-          {busy ? "Writing…" : "Write with AI"}
+        <button type="button" className="a-btn a-btn--primary" style={{ marginTop: 10 }} onClick={() => generate(photo)} disabled={busy || !photo}>
+          {busy ? "AI is reading the photo and writing…" : hasText ? "Rewrite with AI" : "Write with AI"}
         </button>
       ) : (
         <div className="a-alert" style={{ marginTop: 10, marginBottom: 0 }}>
-          Add ANTHROPIC_API_KEY in Vercel to turn this on.
+          Add GEMINI_API_KEY (free, from aistudio.google.com) in Vercel to turn this on.
         </div>
       )}
     </div>

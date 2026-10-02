@@ -259,7 +259,20 @@ export function MediaPreview({ url, mime, className }: { url: string; mime?: str
   );
 }
 
-export function MediaField({ value, onChange, label, help }: { value: string; onChange: (v: string) => void; label: string; help?: string }) {
+export function MediaField({
+  value,
+  onChange,
+  onPicked,
+  label,
+  help,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  /** called only when a file is chosen or uploaded in the media library (not while typing a URL) */
+  onPicked?: (v: string) => void;
+  label: string;
+  help?: string;
+}) {
   const [open, setOpen] = useState(false);
   const { readOnly } = useAdmin();
   return (
@@ -280,6 +293,7 @@ export function MediaField({ value, onChange, label, help }: { value: string; on
           onClose={() => setOpen(false)}
           onPick={(m) => {
             onChange(m.public_url);
+            onPicked?.(m.public_url);
             setOpen(false);
           }}
         />

@@ -33,7 +33,7 @@ The file backend is not suitable for Vercel (the filesystem there is temporary; 
 2. In the Supabase SQL editor run `supabase/migrations/0001_init.sql` (tables, row-level security, `media` bucket).
 3. Put the keys in `.env.local` and run `npm run seed:supabase` once. It loads the starter content and creates the first admin user (`ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD`).
 4. **GitHub repository**: push this folder (the `.gitignore` already excludes `.data`, `.env*`, `node_modules`).
-5. **Vercel**: import the repo, set env vars `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_MEDIA_BUCKET=media`, `NEXT_PUBLIC_SITE_URL=https://your-domain`, optionally `ANTHROPIC_API_KEY` for one-click translation drafts.
+5. **Vercel**: import the repo, set env vars `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_MEDIA_BUCKET=media`, `NEXT_PUBLIC_SITE_URL=https://your-domain`, optionally `GEMINI_API_KEY` (free tier) or `ANTHROPIC_API_KEY` for AI product copy from a photo and one-click translation drafts.
 
 ## Structure
 

@@ -485,31 +485,67 @@ export async function updateUser(id: string, patch: { role?: Role; active?: bool
 }
 
 /* ------------------------------------------------------------------ */
-/* Translation drafts (optional, needs ANTHROPIC_API_KEY)             */
+/* AI drafts (optional). Uses ANTHROPIC_API_KEY when set, otherwise    */
+/* GEMINI_API_KEY (Google AI Studio has a free tier).                  */
 /* ------------------------------------------------------------------ */
 
 const LANG_NAMES: Record<Locale, string> = { en: "English", fr: "French", ar: "Arabic (Modern Standard, as used in Algeria)" };
 
+type AiImage = { mediaType: string; base64: string };
+
+/** One prompt in, plain text out, from whichever AI provider is configured. */
+async function aiComplete({ system, text, image, maxTokens }: { system: string; text: string; image?: AiImage; maxTokens: number }) {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (anthropicKey) {
+    const content = [
+      ...(image ? [{ type: "image", source: { type: "base64", media_type: image.mediaType, data: image.base64 } }] : []),
+      { type: "text", text },
+    ];
+    const res = await fetch(`${process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: "user", content }],
+      }),
+    });
+    if (!res.ok) throw new Error(`AI service returned ${res.status}`);
+    const json = (await res.json()) as { content?: { type: string; text?: string }[] };
+    return json.content?.find((b) => b.type === "text")?.text?.trim() ?? "";
+  }
+  if (geminiKey) {
+    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const res = await fetch(`${process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com"}/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [...(image ? [{ inline_data: { mime_type: image.mediaType, data: image.base64 } }] : []), { text }] }],
+        // room for the model's own reasoning tokens, which count against this limit
+        generationConfig: { maxOutputTokens: maxTokens + 6000 },
+      }),
+    });
+    if (res.status === 429) throw new Error("The free AI quota is used up for now. Try again later.");
+    if (!res.ok) throw new Error(`AI service returned ${res.status}`);
+    const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+    return (json.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("").trim();
+  }
+  throw new Error("AI drafts need GEMINI_API_KEY (free) or ANTHROPIC_API_KEY in the environment.");
+}
+
 export async function draftTranslation(text: string, from: Locale, to: Locale): Promise<ActionResult<string>> {
   try {
     await authorize("content.write");
-    const key = process.env.ANTHROPIC_API_KEY;
-    if (!key) throw new Error("Automatic drafts need ANTHROPIC_API_KEY in the environment.");
     if (!text.trim()) throw new Error("Nothing to translate");
-    const res = await fetch(`${process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"}/v1/messages`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
-        max_tokens: 2000,
-        system:
-          "You translate short website copy for a premium shaving-products brand. Keep line breaks, brand names (GOODMAX) and numbers unchanged. Reply with the translation only.",
-        messages: [{ role: "user", content: `Translate from ${LANG_NAMES[from]} to ${LANG_NAMES[to]}:\n\n${text}` }],
-      }),
+    const out = await aiComplete({
+      system:
+        "You translate short website copy for a premium shaving-products brand. Keep line breaks, brand names (GOODMAX) and numbers unchanged. Reply with the translation only.",
+      text: `Translate from ${LANG_NAMES[from]} to ${LANG_NAMES[to]}:\n\n${text}`,
+      maxTokens: 2000,
     });
-    if (!res.ok) throw new Error(`Translation service returned ${res.status}`);
-    const json = (await res.json()) as { content?: { type: string; text?: string }[] };
-    const out = json.content?.find((b) => b.type === "text")?.text?.trim();
     if (!out) throw new Error("Empty translation");
     return ok(out);
   } catch (e) {
@@ -531,7 +567,7 @@ Rules:
 - If the photo does not show a product clearly, return empty strings.
 - Write natural marketing copy in English, French and Arabic (Modern Standard Arabic). Keep the brand name GOODMAX in Latin letters.
 - name: short product name (max 5 words). short: one sentence. long: 2-3 sentences. alt: a plain description of the photo for screen readers.
-- features: 2 to 4 characteristics visible in the photo, each with a short title and a one-sentence detail.
+- features: 2 to 4 characteristics visible in the photo, each with a short title and a one-sentence detail saying the benefit it gives the user.
 Reply with JSON only, no markdown, in exactly this shape:
 {"name":{"en":"","fr":"","ar":""},"short":{"en":"","fr":"","ar":""},"long":{"en":"","fr":"","ar":""},"alt":{"en":"","fr":"","ar":""},"features":[{"title":{"en":"","fr":"","ar":""},"detail":{"en":"","fr":"","ar":""}}]}`;
 
@@ -539,31 +575,14 @@ Reply with JSON only, no markdown, in exactly this shape:
 export async function draftProductFromImage(imageBase64: string, mediaType: string): Promise<ActionResult<ProductDraft>> {
   try {
     await authorize("content.write");
-    const key = process.env.ANTHROPIC_API_KEY;
-    if (!key) throw new Error("AI drafts need ANTHROPIC_API_KEY in the environment.");
     if (!["image/jpeg", "image/png", "image/webp"].includes(mediaType)) throw new Error("Use a JPEG, PNG or WebP image.");
     if (!imageBase64 || imageBase64.length > 7_000_000) throw new Error("Image is missing or too large.");
-    const res = await fetch(`${process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"}/v1/messages`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
-        max_tokens: 3000,
-        system: PRODUCT_DRAFT_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-              { type: "text", text: "Write the GOODMAX product copy for this photo." },
-            ],
-          },
-        ],
-      }),
+    const text = await aiComplete({
+      system: PRODUCT_DRAFT_PROMPT,
+      text: "Write the GOODMAX product copy for this photo.",
+      image: { mediaType, base64: imageBase64 },
+      maxTokens: 3000,
     });
-    if (!res.ok) throw new Error(`AI service returned ${res.status}`);
-    const json = (await res.json()) as { content?: { type: string; text?: string }[] };
-    const text = json.content?.find((b) => b.type === "text")?.text ?? "";
     const raw = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
     type L = Partial<Record<Locale, unknown>>;
     const parsed = JSON.parse(raw) as { name?: L; short?: L; long?: L; alt?: L; features?: { title?: L; detail?: L }[] };
