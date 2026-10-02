@@ -247,7 +247,16 @@ export async function SectionRenderer({
                   const features = p.features.filter((f) => f.visible);
                   return (
                     <article key={p.id} className="product-card reveal" id={p.slug}>
-                      <ProductStage media={media} thumbsLabel={loc(p.name_json, locale)} />
+                      <ProductStage
+                        media={media}
+                        thumbsLabel={loc(p.name_json, locale)}
+                        zoomLabels={{
+                          zoomIn: t("products.zoom_in"),
+                          zoomOut: t("products.zoom_out"),
+                          zoomInTouch: t("products.zoom_in_touch"),
+                          zoomOutTouch: t("products.zoom_out_touch"),
+                        }}
+                      />
                       <div className="product-card__body">
                         {b && <span className="product-card__brand">{loc(b.name_json, locale)}</span>}
                         <h3>{loc(p.name_json, locale)}</h3>

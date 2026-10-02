@@ -1530,9 +1530,11 @@ main {
   transition: transform 600ms var(--ease);
 }
 .product-float img {
+  display: block;
   height: min(480px, 70vw);
   width: auto;
   border-radius: 14px;
+  transition: transform 450ms var(--ease);
   mask-image: radial-gradient(ellipse 55% 60% at 50% 50%, #000 60%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 55% 60% at 50% 50%, #000 60%, transparent 100%);
 }
@@ -1634,6 +1636,74 @@ main {
 .product-card .btn {
   align-self: flex-start;
   margin-top: auto;
+}
+
+/* product photo zoom: double-click (mouse) or double-tap (touch) */
+.product-card__stage {
+  touch-action: manipulation; /* no browser double-tap zoom here, so two taps reach the photo */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.product-card__stage.has-zoom {
+  cursor: zoom-in;
+}
+.product-card__stage.is-zoomed {
+  cursor: zoom-out;
+  touch-action: none; /* a finger drag pans the photo instead of scrolling the page */
+}
+.product-card__stage.is-zoomed .product-float {
+  transform: none !important; /* parallax off while zoomed */
+}
+.product-card__stage.is-zoomed .product-float img {
+  transform: scale(2.5);
+}
+.product-float__shadow {
+  transition: opacity 300ms var(--ease);
+}
+.product-card__stage.is-zoomed .product-float__shadow {
+  opacity: 0;
+}
+.product-zoom {
+  position: absolute;
+  top: 16px;
+  inset-inline-end: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(2, 8, 20, 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.88);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background var(--d-fast), border-color var(--d-fast);
+}
+.product-zoom:hover,
+.product-zoom:focus-visible {
+  background: rgba(2, 8, 20, 0.75);
+  border-color: #8fbaff;
+}
+.product-zoom svg {
+  flex: none;
+}
+.product-zoom__touch {
+  display: none;
+}
+@media (hover: none) {
+  .product-zoom__mouse {
+    display: none;
+  }
+  .product-zoom__touch {
+    display: inline;
+  }
 }
 @media (max-width: 900px) {
   .product-card {
