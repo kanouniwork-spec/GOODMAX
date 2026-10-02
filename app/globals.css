@@ -24,7 +24,7 @@
   --r-card: 20px;
   --r-button: 999px;
   --r-input: 12px;
-  --section-space: 128px;
+  --section-space: 72px;
 
   --container: 1240px;
   --gutter: clamp(20px, 4vw, 48px);
@@ -155,7 +155,7 @@ p {
 }
 @media (max-width: 760px) {
   .section {
-    padding-block: calc(var(--section-space) * 0.6);
+    padding-block: calc(var(--section-space) * 0.7);
   }
 }
 .section--dark {
@@ -1025,8 +1025,8 @@ main {
    Sections
    ========================================================================== */
 .hero {
-  padding-top: calc(var(--header-h) + clamp(64px, 10vw, 140px));
-  padding-bottom: clamp(56px, 8vw, 110px);
+  padding-top: calc(var(--header-h) + clamp(48px, 7vw, 96px));
+  padding-bottom: clamp(24px, 3vw, 40px);
   position: relative;
   overflow: hidden;
 }

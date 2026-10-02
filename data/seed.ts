@@ -52,7 +52,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   border: "#e3e8ef",
   card_radius: 20,
   button_radius: 999,
-  section_spacing: 128,
+  section_spacing: 72,
   header_transparent_over_video: true,
   logo_url: "/media/goodmax-logo.png",
   logo_light_url: "/media/goodmax-logo-white.png",
