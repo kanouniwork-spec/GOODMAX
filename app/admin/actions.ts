@@ -494,6 +494,18 @@ const LANG_NAMES: Record<Locale, string> = { en: "English", fr: "French", ar: "A
 type AiImage = { mediaType: string; base64: string };
 
 let geminiModel: string | undefined;
+// least reasoning first; a model that rejects a setting (HTTP 400) gets the next one
+const GEMINI_THINKING = [{ thinkingBudget: 0 }, { thinkingLevel: "low" }, undefined] as const;
+let geminiThinkingStep = 0;
+
+/** Google's own error message, short enough for a toast. */
+function googleMessage(body: string) {
+  try {
+    return String((JSON.parse(body) as { error?: { message?: string } }).error?.message ?? "").slice(0, 200);
+  } catch {
+    return body.slice(0, 120);
+  }
+}
 
 /** Lists the Flash models this Gemini key may call, newest first (full Flash before Lite). */
 async function listGeminiModels(base: string, key: string): Promise<string[]> {
@@ -537,42 +549,49 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
     const base = process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com";
     // Vercel stops the function at maxDuration (300s on the product page); all Gemini calls share a 270s budget,
     // and one slow model is given up after 90s so another one can be tried.
-    const deadline = Date.now() + 270_000;
-    let thinkingOff = true;
-    const send = (model: string) =>
-      fetch(`${base}/v1beta/models/${model}:generateContent`, {
+    const started = Date.now();
+    const deadline = started + 270_000;
+    const attempts: string[] = [];
+    const send = async (model: string) => {
+      const t0 = Date.now();
+      const thinking = GEMINI_THINKING[geminiThinkingStep];
+      const r = await fetch(`${base}/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
         signal: AbortSignal.timeout(Math.max(1000, Math.min(90_000, deadline - Date.now()))),
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [...(image ? [{ inline_data: { mime_type: image.mediaType, data: image.base64 } }] : []), { text }] }],
-          // reasoning is slow and not needed for copywriting; room left in case a model thinks anyway
-          generationConfig: { maxOutputTokens: maxTokens + 4000, ...(thinkingOff ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+          // room left in case a model reasons before answering
+          generationConfig: { maxOutputTokens: maxTokens + 4000, ...(thinking ? { thinkingConfig: thinking } : {}) },
         }),
       }).catch((e: Error) => {
         if (e.name !== "TimeoutError" && e.name !== "AbortError") throw e;
-        console.error("Gemini timeout", model);
-        // a fake 504 lets the loop below move on to the next model
-        return new Response("timeout", { status: 504 });
+        // a stand-in 504 lets the loop below move on to the next model
+        return new Response("no answer in time", { status: 504 });
       });
+      attempts.push(`${model} ${r.status} ${Math.round((Date.now() - t0) / 1000)}s`);
+      return r;
+    };
     const call = async (model: string) => {
       let r = await send(model);
-      if (r.status === 400 && thinkingOff) {
-        // some models refuse a thinking budget of 0: ask again without it
-        thinkingOff = false;
+      // reasoning is slow and not needed for copywriting: ask for as little as the model accepts
+      while (r.status === 400 && geminiThinkingStep < GEMINI_THINKING.length - 1) {
+        const body = await r.text();
+        if (!/think/i.test(body)) return new Response(body, { status: 400 }); // a different problem, e.g. the key
+        geminiThinkingStep++;
         r = await send(model);
       }
       return r;
     };
-    // Free-tier models are often busy (503) or get retired (404): retry once, then move on to other Flash models this key can use.
+    // Free-tier models are often busy (503), slow (504) or retired (404): retry once, then move on to other Flash models this key can use.
     const tried = new Set<string>();
     let queue = [geminiModel ?? process.env.GEMINI_MODEL ?? "gemini-flash-latest"];
     let listed = false;
     let res: Response | undefined;
-    let model = "";
+    let errorText = "";
     while (queue.length && deadline - Date.now() > 20_000) {
-      model = queue.shift()!;
+      const model = queue.shift()!;
       if (tried.has(model)) continue;
       tried.add(model);
       res = await call(model);
@@ -580,24 +599,25 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
         await new Promise((r) => setTimeout(r, 1500));
         res = await call(model);
       }
-      if (res.ok || res.status === 429 || ![404, 500, 503, 504].includes(res.status)) break;
-      console.error("Gemini error", res.status, model, (await res.text()).slice(0, 300));
+      if (res.ok) {
+        geminiModel = model;
+        const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+        return (json.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("").trim();
+      }
+      errorText = await res.text();
+      console.error("Gemini error", res.status, model, errorText.slice(0, 500));
+      if (res.status === 429 || ![404, 500, 503, 504].includes(res.status)) break;
       if (!listed) {
         listed = true;
         queue = [...queue, ...(await listGeminiModels(base, geminiKey))];
       }
     }
-    if (!res) throw new Error("AI service unavailable");
-    if (res.status === 429) throw new Error("The free AI quota is used up for now. Try again later.");
-    if (res.status === 503) throw new Error("Google's AI is busy right now. Wait a minute and try again.");
-    if (res.status === 504) throw new Error("Google's AI did not answer in time. Try again in a minute.");
-    if (!res.ok) {
-      console.error("Gemini error", res.status, model, (await res.text()).slice(0, 500));
-      throw new Error(`AI service returned ${res.status}`);
-    }
-    geminiModel = model;
-    const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
-    return (json.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("").trim();
+    // the details in brackets let us see what Google answered without access to the server logs
+    const detail = ` [${attempts.join(", ")}${googleMessage(errorText) ? ` | ${googleMessage(errorText)}` : ""}]`;
+    if (res?.status === 429) throw new Error(`The free AI quota is used up for now. Try again later.${detail}`);
+    if (res?.status === 503) throw new Error(`Google's AI is busy right now. Wait a minute and try again.${detail}`);
+    if (res?.status === 504) throw new Error(`Google's AI did not answer in time. Try again in a minute.${detail}`);
+    throw new Error(`AI service returned ${res?.status ?? "no answer"}.${detail}`);
   }
   throw new Error("AI drafts need GEMINI_API_KEY (free) or ANTHROPIC_API_KEY in the environment.");
 }
