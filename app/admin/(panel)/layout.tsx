@@ -13,7 +13,7 @@ export default async function Panel({ children }: { children: React.ReactNode })
   const newCount = requests.filter((r) => r.status === "new").length + messages.filter((m) => m.status === "new").length;
   const store = db();
   return (
-    <AdminProviders canTranslate={!!(process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY)} readOnly={!can(user.role, "content.write")}>
+    <AdminProviders canTranslate={!!(process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY || process.env.GOODMAXAPIgemini)} readOnly={!can(user.role, "content.write")}>
       <MediaListProvider media={media}>
         <div className="a-shell">
           <aside className="a-side">

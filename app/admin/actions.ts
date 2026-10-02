@@ -513,7 +513,7 @@ async function listGeminiModels(base: string, key: string): Promise<string[]> {
 /** One prompt in, plain text out, from whichever AI provider is configured. */
 async function aiComplete({ system, text, image, maxTokens }: { system: string; text: string; image?: AiImage; maxTokens: number }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOODMAXAPIgemini; // second name is the one set in Vercel
   if (anthropicKey) {
     const content = [
       ...(image ? [{ type: "image", source: { type: "base64", media_type: image.mediaType, data: image.base64 } }] : []),
