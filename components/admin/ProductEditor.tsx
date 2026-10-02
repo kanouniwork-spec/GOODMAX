@@ -98,6 +98,7 @@ function AiFromPhoto({ value, set }: { value: Obj; set: (v: Obj) => void }) {
           visible: true,
         })),
         media: nextMedia,
+        seo_json: { ...((value.seo_json as Obj) ?? {}), title: d.seo_json.title, description: d.seo_json.description },
         slug: value.slug || d.name_json.en.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
       });
       toast("Draft written in EN, FR and AR. Review it, then save.");
@@ -112,7 +113,7 @@ function AiFromPhoto({ value, set }: { value: Obj; set: (v: Obj) => void }) {
     <div className="a-card">
       <h2>Write with AI from a photo</h2>
       <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-        Upload a product photo. AI reads it and writes the name, description and benefits in English, French and Arabic. Nothing is saved until you click Save draft.
+        Upload a product photo. AI reads it and writes the name, descriptions, technical characteristics with their benefits and the SEO text in English, French and Arabic. Nothing is saved until you click Save draft.
       </p>
       <MediaField
         label="Product photo"

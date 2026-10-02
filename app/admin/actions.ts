@@ -495,10 +495,10 @@ type AiImage = { mediaType: string; base64: string };
 
 let geminiModel: string | undefined;
 
-/** Lists the models this Gemini key may call and returns the newest general-purpose Flash model. */
-async function pickGeminiModel(base: string, key: string) {
+/** Lists the Flash models this Gemini key may call, newest first (full Flash before Lite). */
+async function listGeminiModels(base: string, key: string): Promise<string[]> {
   const res = await fetch(`${base}/v1beta/models?pageSize=200`, { headers: { "x-goog-api-key": key } });
-  if (!res.ok) return undefined;
+  if (!res.ok) return [];
   const json = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
   const names = (json.models ?? [])
     .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
@@ -507,7 +507,7 @@ async function pickGeminiModel(base: string, key: string) {
   const version = (n: string) => Number(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
   names.sort((a, b) => version(b) - version(a) || Number(/lite/.test(a)) - Number(/lite/.test(b)) || a.length - b.length);
   console.log("Gemini models available:", names.slice(0, 8).join(", "));
-  return names[0];
+  return names.slice(0, 5);
 }
 
 /** One prompt in, plain text out, from whichever AI provider is configured. */
@@ -546,17 +546,31 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
           generationConfig: { maxOutputTokens: maxTokens + 6000 },
         }),
       });
-    let model = geminiModel ?? process.env.GEMINI_MODEL ?? "gemini-flash-latest";
-    let res = await call(model);
-    if (res.status === 404) {
-      // Google retires model names; ask which ones this key can use and take the newest Flash model.
-      const found = await pickGeminiModel(base, geminiKey);
-      if (found && found !== model) {
-        model = found;
+    // Free-tier models are often busy (503) or get retired (404): retry once, then move on to other Flash models this key can use.
+    const tried = new Set<string>();
+    let queue = [geminiModel ?? process.env.GEMINI_MODEL ?? "gemini-flash-latest"];
+    let listed = false;
+    let res: Response | undefined;
+    let model = "";
+    while (queue.length) {
+      model = queue.shift()!;
+      if (tried.has(model)) continue;
+      tried.add(model);
+      res = await call(model);
+      if (res.status === 503 || res.status === 500) {
+        await new Promise((r) => setTimeout(r, 1500));
         res = await call(model);
       }
+      if (res.ok || res.status === 429 || ![404, 500, 503].includes(res.status)) break;
+      console.error("Gemini error", res.status, model, (await res.text()).slice(0, 300));
+      if (!listed) {
+        listed = true;
+        queue = [...queue, ...(await listGeminiModels(base, geminiKey))];
+      }
     }
+    if (!res) throw new Error("AI service unavailable");
     if (res.status === 429) throw new Error("The free AI quota is used up for now. Try again later.");
+    if (res.status === 503) throw new Error("Google's AI is busy right now. Wait a minute and try again.");
     if (!res.ok) {
       console.error("Gemini error", res.status, model, (await res.text()).slice(0, 500));
       throw new Error(`AI service returned ${res.status}`);
@@ -590,6 +604,7 @@ export type ProductDraft = {
   short_description_json: Record<Locale, string>;
   description_json: Record<Locale, string>;
   alt_json: Record<Locale, string>;
+  seo_json: { title: Record<Locale, string>; description: Record<Locale, string> };
   features: { title_json: Record<Locale, string>; body_json: Record<Locale, string> }[];
 };
 
@@ -599,9 +614,10 @@ Rules:
 - If the photo does not show a product clearly, return empty strings.
 - Write natural marketing copy in English, French and Arabic (Modern Standard Arabic). Keep the brand name GOODMAX in Latin letters.
 - name: short product name (max 5 words). short: one sentence. long: 2-3 sentences. alt: a plain description of the photo for screen readers.
-- features: 2 to 4 characteristics visible in the photo, each with a short title and a one-sentence detail saying the benefit it gives the user.
+- features: 3 to 5 technical characteristics visible in the photo (e.g. blade count, head, strip, handle, grip), each with a short title and a one-sentence detail saying the benefit it gives the user.
+- seo_title: search-engine title, max 60 characters, including the product name and GOODMAX. seo_description: max 155 characters, one sentence that makes people click.
 Reply with JSON only, no markdown, in exactly this shape:
-{"name":{"en":"","fr":"","ar":""},"short":{"en":"","fr":"","ar":""},"long":{"en":"","fr":"","ar":""},"alt":{"en":"","fr":"","ar":""},"features":[{"title":{"en":"","fr":"","ar":""},"detail":{"en":"","fr":"","ar":""}}]}`;
+{"name":{"en":"","fr":"","ar":""},"short":{"en":"","fr":"","ar":""},"long":{"en":"","fr":"","ar":""},"alt":{"en":"","fr":"","ar":""},"features":[{"title":{"en":"","fr":"","ar":""},"detail":{"en":"","fr":"","ar":""}}],"seo_title":{"en":"","fr":"","ar":""},"seo_description":{"en":"","fr":"","ar":""}}`;
 
 /** Drafts product name, descriptions and visible characteristics in EN/FR/AR from one photo. */
 export async function draftProductFromImage(imageBase64: string, mediaType: string): Promise<ActionResult<ProductDraft>> {
@@ -617,13 +633,14 @@ export async function draftProductFromImage(imageBase64: string, mediaType: stri
     });
     const raw = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
     type L = Partial<Record<Locale, unknown>>;
-    const parsed = JSON.parse(raw) as { name?: L; short?: L; long?: L; alt?: L; features?: { title?: L; detail?: L }[] };
+    const parsed = JSON.parse(raw) as { name?: L; short?: L; long?: L; alt?: L; seo_title?: L; seo_description?: L; features?: { title?: L; detail?: L }[] };
     const loc = (o?: L) => Object.fromEntries(LOCALES.map((l) => [l, typeof o?.[l] === "string" ? (o[l] as string).trim().slice(0, 2000) : ""])) as Record<Locale, string>;
     const draft: ProductDraft = {
       name_json: loc(parsed.name),
       short_description_json: loc(parsed.short),
       description_json: loc(parsed.long),
       alt_json: loc(parsed.alt),
+      seo_json: { title: loc(parsed.seo_title), description: loc(parsed.seo_description) },
       features: (Array.isArray(parsed.features) ? parsed.features : []).slice(0, 6).map((f) => ({ title_json: loc(f.title), body_json: loc(f.detail) })),
     };
     if (!draft.name_json.en && !draft.short_description_json.en) throw new Error("The AI could not see a product in this image.");
