@@ -48,12 +48,12 @@ export function ProductEditor({
   );
 }
 
-/** Resizes the photo in the browser (max 1568px, JPEG) and returns base64 without the data: prefix. */
+/** Resizes the photo in the browser (max 1024px, JPEG) and returns base64 without the data: prefix. */
 async function photoToBase64(url: string) {
   const res = await fetch(url);
   if (!res.ok) throw new Error("Could not load that image.");
   const bitmap = await createImageBitmap(await res.blob());
-  const scale = Math.min(1, 1568 / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
@@ -61,7 +61,7 @@ async function photoToBase64(url: string) {
   ctx.fillStyle = "#ffffff"; // transparent PNGs get a white background
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.85).split(",")[1];
+  return canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
 }
 
 function AiFromPhoto({ value, set }: { value: Obj; set: (v: Obj) => void }) {

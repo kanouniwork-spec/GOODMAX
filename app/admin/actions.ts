@@ -535,29 +535,45 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
   }
   if (geminiKey) {
     const base = process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com";
-    const call = (model: string) =>
+    // Vercel stops the function at maxDuration (60s), so every Gemini call shares a 50s budget.
+    const deadline = Date.now() + 50_000;
+    let thinkingOff = true;
+    const send = (model: string) =>
       fetch(`${base}/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
+        signal: AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [...(image ? [{ inline_data: { mime_type: image.mediaType, data: image.base64 } }] : []), { text }] }],
-          // room for the model's own reasoning tokens, which count against this limit
-          generationConfig: { maxOutputTokens: maxTokens + 6000 },
+          // reasoning is slow and not needed for copywriting; room left in case a model thinks anyway
+          generationConfig: { maxOutputTokens: maxTokens + 4000, ...(thinkingOff ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
         }),
+      }).catch((e: Error) => {
+        if (e.name === "TimeoutError" || e.name === "AbortError") throw new Error("Google's AI took too long. Try again.");
+        throw e;
       });
+    const call = async (model: string) => {
+      let r = await send(model);
+      if (r.status === 400 && thinkingOff) {
+        // some models refuse a thinking budget of 0: ask again without it
+        thinkingOff = false;
+        r = await send(model);
+      }
+      return r;
+    };
     // Free-tier models are often busy (503) or get retired (404): retry once, then move on to other Flash models this key can use.
     const tried = new Set<string>();
     let queue = [geminiModel ?? process.env.GEMINI_MODEL ?? "gemini-flash-latest"];
     let listed = false;
     let res: Response | undefined;
     let model = "";
-    while (queue.length) {
+    while (queue.length && deadline - Date.now() > 15_000) {
       model = queue.shift()!;
       if (tried.has(model)) continue;
       tried.add(model);
       res = await call(model);
-      if (res.status === 503 || res.status === 500) {
+      if ((res.status === 503 || res.status === 500) && deadline - Date.now() > 20_000) {
         await new Promise((r) => setTimeout(r, 1500));
         res = await call(model);
       }
