@@ -493,6 +493,23 @@ const LANG_NAMES: Record<Locale, string> = { en: "English", fr: "French", ar: "A
 
 type AiImage = { mediaType: string; base64: string };
 
+let geminiModel: string | undefined;
+
+/** Lists the models this Gemini key may call and returns the newest general-purpose Flash model. */
+async function pickGeminiModel(base: string, key: string) {
+  const res = await fetch(`${base}/v1beta/models?pageSize=200`, { headers: { "x-goog-api-key": key } });
+  if (!res.ok) return undefined;
+  const json = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
+  const names = (json.models ?? [])
+    .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+    .map((m) => m.name.replace(/^models\//, ""))
+    .filter((n) => /flash/.test(n) && !/(image|tts|audio|live|thinking|exp|preview|8b)/.test(n));
+  const version = (n: string) => Number(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
+  names.sort((a, b) => version(b) - version(a) || Number(/lite/.test(a)) - Number(/lite/.test(b)) || a.length - b.length);
+  console.log("Gemini models available:", names.slice(0, 8).join(", "));
+  return names[0];
+}
+
 /** One prompt in, plain text out, from whichever AI provider is configured. */
 async function aiComplete({ system, text, image, maxTokens }: { system: string; text: string; image?: AiImage; maxTokens: number }) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -517,19 +534,34 @@ async function aiComplete({ system, text, image, maxTokens }: { system: string; 
     return json.content?.find((b) => b.type === "text")?.text?.trim() ?? "";
   }
   if (geminiKey) {
-    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-    const res = await fetch(`${process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com"}/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [...(image ? [{ inline_data: { mime_type: image.mediaType, data: image.base64 } }] : []), { text }] }],
-        // room for the model's own reasoning tokens, which count against this limit
-        generationConfig: { maxOutputTokens: maxTokens + 6000 },
-      }),
-    });
+    const base = process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com";
+    const call = (model: string) =>
+      fetch(`${base}/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": geminiKey },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [...(image ? [{ inline_data: { mime_type: image.mediaType, data: image.base64 } }] : []), { text }] }],
+          // room for the model's own reasoning tokens, which count against this limit
+          generationConfig: { maxOutputTokens: maxTokens + 6000 },
+        }),
+      });
+    let model = geminiModel ?? process.env.GEMINI_MODEL ?? "gemini-flash-latest";
+    let res = await call(model);
+    if (res.status === 404) {
+      // Google retires model names; ask which ones this key can use and take the newest Flash model.
+      const found = await pickGeminiModel(base, geminiKey);
+      if (found && found !== model) {
+        model = found;
+        res = await call(model);
+      }
+    }
     if (res.status === 429) throw new Error("The free AI quota is used up for now. Try again later.");
-    if (!res.ok) throw new Error(`AI service returned ${res.status}`);
+    if (!res.ok) {
+      console.error("Gemini error", res.status, model, (await res.text()).slice(0, 500));
+      throw new Error(`AI service returned ${res.status}`);
+    }
+    geminiModel = model;
     const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
     return (json.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? "").join("").trim();
   }
