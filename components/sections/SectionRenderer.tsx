@@ -47,6 +47,37 @@ function Head({ x, h1, className = "display-lg" }: { x: Ctx; h1?: boolean; class
   );
 }
 
+/** Endless logo strip; each logo opens that brand's product gallery. Pauses on hover/focus. */
+function BrandMarquee({ brands, label }: { brands: { id: string; href: string; name: string; logo: string; accent: string }[]; label: string }) {
+  // repeat short lists so one copy is wider than the screen, then render it twice for a seamless loop
+  const copy = Array.from({ length: Math.max(1, Math.ceil(8 / brands.length)) }, () => brands).flat();
+  return (
+    <div className="brand-marquee" style={{ ["--marquee-duration" as string]: `${Math.max(20, copy.length * 4)}s` }}>
+      {[0, 1].map((half) => (
+        <ul className="brand-marquee__track" key={half} aria-hidden={half === 1 || undefined}>
+          {copy.map((b, i) => (
+            <li key={`${b.id}-${i}`} className={i >= brands.length ? "dup" : undefined}>
+              <Link
+                href={b.href}
+                className="brand-logo"
+                style={{ ["--accent" as string]: b.accent || undefined }}
+                tabIndex={half === 1 || i >= brands.length ? -1 : undefined}
+                aria-label={`${b.name}: ${label}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {b.logo ? <img src={b.logo} alt="" loading="lazy" /> : <span className="brand-logo__name">{b.name}</span>}
+                <span className="brand-logo__cta">
+                  {label} <Arrow />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ))}
+    </div>
+  );
+}
+
 export async function SectionRenderer({
   section,
   index,
@@ -133,6 +164,17 @@ export async function SectionRenderer({
             <Head x={x} />
             {brands.length === 0 ? (
               <p className="empty">{t("brands.empty")}</p>
+            ) : (x.c.layout || (section.page_slug === "home" ? "marquee" : "cards")) === "marquee" ? (
+              <BrandMarquee
+                label={t("brands.view")}
+                brands={brands.map((b) => ({
+                  id: b.id,
+                  href: `/products?brand=${encodeURIComponent(b.slug)}#products`,
+                  name: loc(b.name_json, locale),
+                  logo: b.logo_url,
+                  accent: b.accent_color,
+                }))}
+              />
             ) : (
               <div className="brand-rail">
                 {brands.map((b, i) => {
@@ -180,14 +222,15 @@ export async function SectionRenderer({
       return (
         <section className="section" id={anchor} style={{ paddingTop: 0 }}>
           <div className="container">
+            <span id="products" className="anchor" />
             <Head x={x} />
             {brandsWithProducts.length > 0 && (
               <nav className="filter-bar" aria-label={t("products.filter")}>
-                <Link className="chip" href="/products" aria-current={!brand}>
+                <Link className="chip" href="/products#products" scroll={false} aria-current={!brand}>
                   {t("products.all")}
                 </Link>
                 {brands.map((b) => (
-                  <Link key={b.id} className="chip" href={`/products?brand=${b.slug}`} aria-current={brand?.id === b.id}>
+                  <Link key={b.id} className="chip" href={`/products?brand=${b.slug}#products`} scroll={false} aria-current={brand?.id === b.id}>
                     {loc(b.name_json, locale)}
                   </Link>
                 ))}

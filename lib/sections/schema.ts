@@ -95,8 +95,24 @@ export const SECTION_DEFINITIONS: Record<SectionType, SectionDefinition> = {
   brand_rail: {
     type: "brand_rail",
     name: "Brand Rail",
-    description: "Brand selector cards, quiet at rest and lit on hover.",
-    fields: [eyebrow, title, { key: "subtitle", type: "ltextarea", label: "Subtitle" }, { key: "limit", type: "number", label: "Max brands (0 = all)", min: 0, max: 24 }],
+    description: "Brand selector: an animated logo loop or cards. Each brand opens its product gallery.",
+    fields: [
+      eyebrow,
+      title,
+      { key: "subtitle", type: "ltextarea", label: "Subtitle" },
+      {
+        key: "layout",
+        type: "select",
+        label: "Style",
+        help: "Empty = logo loop on the home page, cards elsewhere.",
+        options: [
+          { value: "", label: "Automatic" },
+          { value: "marquee", label: "Animated logo loop" },
+          { value: "cards", label: "Cards" },
+        ],
+      },
+      { key: "limit", type: "number", label: "Max brands (0 = all)", min: 0, max: 24 },
+    ],
   },
   product_grid: {
     type: "product_grid",
