@@ -2027,7 +2027,7 @@ main {
 }
 .brand-logo:hover,
 .brand-logo:focus-visible {
-  color: var(--c-primary);
+  color: var(--c-navy); /* same blue as the GOODMAX logo */
   transform: scale(1.06);
 }
 @media (prefers-reduced-motion: reduce) {
