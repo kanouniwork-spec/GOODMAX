@@ -162,11 +162,25 @@ export function RecordEditor({
     });
 
   const pc = collection as PublishableCollection;
+  const publishable = ["page_sections", "brands", "products"].includes(collection);
+  /** Saves first when needed (also for a brand-new record), then publishes the chosen languages. */
   const doPublish = async () => {
-    if (dirty && !(await run(() => saveRecord(collection, id, transform(value))))) return;
-    setDirty(false);
+    let target = id;
+    if (!target || dirty) {
+      let savedId: string | undefined;
+      if (!(await run(() => saveRecord(collection, id, transform(value)), undefined, (d) => (savedId = d?.id)))) return;
+      setDirty(false);
+      target = target ?? savedId ?? null;
+    }
+    if (!target) return;
     const all = locales.length === LOCALES.length;
-    run(() => publishRecord(pc, id!, all ? "all" : locales), all ? "Published" : `Published ${locales.map((l) => l.toUpperCase()).join(", ")}`);
+    await run(
+      () => publishRecord(pc, target, all ? "all" : locales),
+      all ? "Published: it is now live on the site" : `Published ${locales.map((l) => l.toUpperCase()).join(", ")}`,
+      () => {
+        if (!id) router.replace(`${backHref}/${target}`);
+      },
+    );
   };
 
   return (
@@ -186,8 +200,13 @@ export function RecordEditor({
             </a>
           )}
           {!readOnly && (
-            <button type="button" className="a-btn a-btn--primary" onClick={save} disabled={pending}>
-              {publish || ["page_sections", "brands", "products"].includes(collection) ? "Save draft" : "Save"}
+            <button type="button" className={`a-btn${publishable ? "" : " a-btn--primary"}`} onClick={save} disabled={pending}>
+              {publishable ? "Save draft" : "Save"}
+            </button>
+          )}
+          {!readOnly && publishable && (
+            <button type="button" className="a-btn a-btn--primary" onClick={doPublish} disabled={pending || !locales.length}>
+              Publish
             </button>
           )}
         </div>

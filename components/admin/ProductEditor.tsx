@@ -113,7 +113,7 @@ function AiFromPhoto({ value, set }: { value: Obj; set: (v: Obj) => void }) {
     <div className="a-card">
       <h2>Write with AI from a photo</h2>
       <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-        Upload a product photo. AI reads it and writes the name, descriptions, technical characteristics with their benefits and the SEO text in English, French and Arabic. Nothing is saved until you click Save draft.
+        Upload a product photo. AI reads it and writes the name, descriptions, technical characteristics with their benefits and the SEO text in English, French and Arabic. Nothing is saved until you click Save draft or Publish.
       </p>
       <MediaField
         label="Product photo"
