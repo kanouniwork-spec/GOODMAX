@@ -1976,7 +1976,7 @@ main {
   display: flex;
   gap: var(--marquee-gap);
   overflow: hidden;
-  padding-block: 12px 28px;
+  padding-block: 12px;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
 }
@@ -2050,3 +2050,7 @@ main {
     display: none;
   }
 }
+
+/* the logo loop has no bottom content, so tighten the gap to the next section */
+.section:has(.brand-marquee) { padding-bottom: 0; }
+.section:has(.brand-marquee) + .section:not(.section--dark):not(.section--surface) { padding-top: clamp(40px, 5vw, 64px); }
