@@ -1187,11 +1187,14 @@ main {
   color: rgba(255, 255, 255, 0.6);
 }
 .brand-card__logo {
-  height: 30px;
+  height: 56px;
   width: auto;
-  max-width: 160px;
+  max-width: 200px;
   object-fit: contain;
+  object-position: left center;
+  filter: brightness(0) invert(1); /* grey logo files shown white on the dark card */
 }
+[dir="rtl"] .brand-card__logo { object-position: right center; }
 .brand-card h3 {
   font-size: clamp(30px, 3vw, 42px);
 }

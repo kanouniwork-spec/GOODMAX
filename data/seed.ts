@@ -428,7 +428,7 @@ function brands(): Brand[] {
         ? L("Demo brand — rename or delete in Admin › Brands.", "Marque de démonstration — à renommer ou supprimer dans Admin › Marques.", "علامة تجريبية — أعد تسميتها أو احذفها من الإدارة › العلامات.")
         : L("Brand description to be added.", "Description de la marque à ajouter.", "وصف العلامة سيضاف لاحقاً."),
       cta_json: L("View products", "Voir les produits", "عرض المنتجات"),
-      logo_url: placeholder ? "" : "/media/goodmax-logo-white.png",
+      logo_url: `/media/brands/${slug}.png`,
       accent_color: accent,
       background_url: bg,
     };
@@ -444,10 +444,17 @@ function brands(): Brand[] {
       is_placeholder: true,
     };
   };
+  // real brand names and logos supplied by GOODMAX (descriptions still to come)
   return [
-    base(1, "goodmax", L("GOODMAX", "GOODMAX", "GOODMAX"), "#1d5bd8", false, "/media/still-razor-front.jpg"),
-    base(2, "demo-brand-2", L("Demo brand 2", "Marque démo 2", "علامة تجريبية 2"), "#13a37f", true, ""),
-    base(3, "demo-brand-3", L("Demo brand 3", "Marque démo 3", "علامة تجريبية 3"), "#c2410c", true, ""),
+    base(1, "vistar-bouti", L("Vistar BouTi", "Vistar BouTi", "Vistar BouTi"), "#072f54", false, ""),
+    base(2, "goodmax-x", L("GoodMax", "GoodMax", "GoodMax"), "#072f54", false, ""),
+    base(3, "goodmax", L("GOODMAX", "GOODMAX", "قود ماكس"), "#072f54", false, "/media/still-razor-front.jpg"),
+    base(4, "super-goodmax", L("Super GoodMax", "Super GoodMax", "Super GoodMax"), "#072f54", false, ""),
+    base(5, "b7b", L("B7B", "B7B", "B7B"), "#072f54", false, ""),
+    base(6, "alg-max", L("ALG MAX", "ALG MAX", "ALG MAX"), "#072f54", false, ""),
+    base(7, "glasmax", L("GLASMAX", "GLASMAX", "GLASMAX"), "#072f54", false, ""),
+    base(8, "darcon", L("DARCON", "DARCON", "DARCON"), "#072f54", false, ""),
+    base(9, "big-one", L("BIG ONE", "BIG ONE", "بيق وان"), "#072f54", false, ""),
   ];
 }
 
