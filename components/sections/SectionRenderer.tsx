@@ -50,7 +50,7 @@ function Head({ x, h1, className = "display-lg" }: { x: Ctx; h1?: boolean; class
 /** Endless logo strip; each logo opens that brand's product gallery. Pauses on hover/focus. */
 function BrandMarquee({ brands, label }: { brands: { id: string; href: string; name: string; logo: string; accent: string }[]; label: string }) {
   // repeat short lists so one copy is wider than the screen, then render it twice for a seamless loop
-  const copy = Array.from({ length: Math.max(1, Math.ceil(8 / brands.length)) }, () => brands).flat();
+  const copy = Array.from({ length: Math.max(1, Math.ceil(10 / brands.length)) }, () => brands).flat();
   return (
     <div className="brand-marquee" style={{ ["--marquee-duration" as string]: `${Math.max(20, copy.length * 4)}s` }}>
       {[0, 1].map((half) => (
@@ -60,15 +60,14 @@ function BrandMarquee({ brands, label }: { brands: { id: string; href: string; n
               <Link
                 href={b.href}
                 className="brand-logo"
-                style={{ ["--accent" as string]: b.accent || undefined }}
                 tabIndex={half === 1 || i >= brands.length ? -1 : undefined}
                 aria-label={`${b.name}: ${label}`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {b.logo ? <img src={b.logo} alt="" loading="lazy" /> : <span className="brand-logo__name">{b.name}</span>}
-                <span className="brand-logo__cta">
-                  {label} <Arrow />
-                </span>
+                {b.logo ? (
+                  <span className="brand-logo__mark" style={{ ["--logo" as string]: `url("${b.logo}")` }} />
+                ) : (
+                  <span className="brand-logo__name">{b.name}</span>
+                )}
               </Link>
             </li>
           ))}
