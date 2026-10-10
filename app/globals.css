@@ -619,6 +619,32 @@ main {
   color: var(--c-on-dark-muted);
   max-width: 34ch;
 }
+.site-footer__maker {
+  margin-top: 32px;
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+.site-footer__maker span {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-on-dark-muted);
+}
+[dir="rtl"] .site-footer__maker span {
+  letter-spacing: 0;
+  font-family: var(--f-body);
+  font-size: 13px;
+}
+.site-footer__brand .site-footer__maker img {
+  width: auto;
+  height: 44px;
+  max-width: 100%;
+  margin: 0;
+  opacity: 0.92;
+}
 .site-footer__bottom {
   margin-top: 72px;
   padding-top: 24px;

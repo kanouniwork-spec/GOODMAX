@@ -23,6 +23,13 @@ export async function Footer() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={appearance.logo_light_url} alt={general.site_name} width={180} height={40} />
             <p>{loc(footer.statement_json, locale)}</p>
+            {footer.maker_logo_url && (
+              <div className="site-footer__maker">
+                {loc(footer.maker_label_json, locale) && <span>{loc(footer.maker_label_json, locale)}</span>}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={footer.maker_logo_url} alt={footer.maker_name} loading="lazy" />
+              </div>
+            )}
           </div>
           <div>
             <h2>{t("footer.navigation")}</h2>

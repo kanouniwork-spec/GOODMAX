@@ -43,6 +43,9 @@ const FOOTER: Field[] = [
   { key: "statement_json", type: "ltextarea", label: "Footer statement" },
   { key: "copyright_json", type: "ltext", label: "Copyright line" },
   { key: "show_languages", type: "boolean", label: "Show language list" },
+  { key: "maker_logo_url", type: "media", label: "Manufacturer logo (white, under the statement; empty hides it)" },
+  { key: "maker_label_json", type: "ltext", label: "Text above the manufacturer logo" },
+  { key: "maker_name", type: "text", label: "Manufacturer name (read out by screen readers)" },
   {
     key: "legal_links",
     type: "items",

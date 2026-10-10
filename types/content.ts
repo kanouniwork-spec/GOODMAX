@@ -303,6 +303,10 @@ export interface FooterSettings {
   legal_links: { id: string; label_json: LocalizedText; url: string; visible: boolean }[];
   copyright_json: LocalizedText;
   show_languages: boolean;
+  /** manufacturer credit under the statement; hidden when the logo is empty */
+  maker_label_json: LocalizedText;
+  maker_logo_url: string;
+  maker_name: string;
 }
 
 export interface SiteSettingsMap {

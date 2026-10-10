@@ -71,6 +71,9 @@ export const DEFAULT_FOOTER: FooterSettings = {
   ],
   copyright_json: L("All rights reserved.", "Tous droits réservés.", "جميع الحقوق محفوظة."),
   show_languages: true,
+  maker_label_json: L("Made in Algeria by", "Fabriqué en Algérie par", "صُنع في الجزائر من طرف"),
+  maker_logo_url: "/media/vistar-bouti-white.png",
+  maker_name: "Vistar-Bouti",
 };
 
 export const DEFAULT_SETTINGS: SiteSettingsMap = {
@@ -111,12 +114,6 @@ function section(
     is_placeholder: opts.placeholder ?? false,
   };
 }
-
-const PH = L(
-  "Placeholder — replace in Admin › Page Builder.",
-  "Texte provisoire — à remplacer dans Admin › Page Builder.",
-  "نص مؤقت — يُستبدل من الإدارة › منشئ الصفحات.",
-);
 
 function sections(): PageSection[] {
   counter = 0;
@@ -190,28 +187,22 @@ function sections(): PageSection[] {
       subtitle: {},
       limit: 0,
     }),
-    section(
-      "home",
-      "rich_text",
-      {
-        eyebrow: L("The GOODMAX story", "L'histoire GOODMAX", "قصة GOODMAX"),
-        title: L("Built around a precise everyday shave.", "Pensé pour un rasage précis au quotidien.", "مصمم لحلاقة يومية دقيقة."),
-        body: PH,
-        link_label: L("About GOODMAX", "À propos de GOODMAX", "عن GOODMAX"),
-        link_url: "/about",
-      },
-      { placeholder: true },
-    ),
-    section(
-      "home",
-      "timeline",
-      {
-        eyebrow: L("Milestones", "Étapes", "محطات"),
-        title: L("Our journey", "Notre parcours", "مسيرتنا"),
-        items: milestones(),
-      },
-      { placeholder: true },
-    ),
+    section("home", "rich_text", {
+      eyebrow: L("The GOODMAX story", "L'histoire GOODMAX", "قصة GOODMAX"),
+      title: L("International quality, Algerian expertise", "Qualité internationale, expertise algérienne", "جودة عالمية، وخبرة جزائرية"),
+      body: L(
+        "GOODMAX builds on a heritage of experience and know-how in shaving and personal care, combining international standards with local manufacturing and a vision centred on quality and innovation.\n\nGOODMAX is manufactured in Algeria by Vistar-Bouti under licence from the parent company, drawing on expertise in import and export built up since 1995, and on an industrial journey that began in 2023 with the opening of its first factory dedicated to disposable razors.",
+        "GOODMAX s’appuie sur un héritage d’expérience et de savoir-faire dans le secteur du rasage et des soins personnels, alliant standards internationaux et fabrication locale, avec une vision axée sur la qualité et l’innovation.\n\nGOODMAX est fabriquée en Algérie par Vistar-Bouti, sous licence de la société mère, bénéficiant d’une expertise acquise depuis 1995 dans le domaine de l’import-export, ainsi que d’un parcours industriel amorcé en 2023 avec la création de sa première usine spécialisée dans la fabrication de rasoirs jetables.",
+        "ترتكز GOODMAX على إرث من الخبرة والدراية في مجال الحلاقة والعناية الشخصية، يجمع بين المعايير الدولية والتصنيع المحلي، برؤية تركّز على الجودة والابتكار.\n\nتُصنَّع GOODMAX في الجزائر من طرف Vistar-Bouti بترخيص من الشركة الأم، مستفيدةً من خبرة في مجال الاستيراد والتصدير مكتسبة منذ سنة 1995، ومن مسار صناعي انطلق سنة 2023 بإنشاء أول مصنع لها متخصص في صناعة شفرات الحلاقة أحادية الاستعمال.",
+      ),
+      link_label: L("About GOODMAX", "À propos de GOODMAX", "عن GOODMAX"),
+      link_url: "/about",
+    }),
+    section("home", "timeline", {
+      eyebrow: L("Milestones", "Étapes", "محطات"),
+      title: L("Our journey", "Notre parcours", "مسيرتنا"),
+      items: milestones(),
+    }),
     section("home", "network", {
       eyebrow: L("Distribution network", "Réseau de distribution", "شبكة التوزيع"),
       title: L("Building coverage across Algeria.", "Une couverture en construction à travers l'Algérie.", "نبني تغطية عبر الجزائر."),
@@ -240,54 +231,66 @@ function sections(): PageSection[] {
     }),
 
     /* ---------------- ABOUT ---------------- */
-    section(
-      "about",
-      "hero",
-      {
-        eyebrow: L("About", "À propos", "من نحن"),
-        title: L("About GOODMAX", "À propos de GOODMAX", "عن GOODMAX"),
-        subtitle: PH,
-        media_url: "/media/still-blade-closeup.jpg",
-        media_type: "image",
-      },
-      { placeholder: true },
-    ),
-    section(
-      "about",
-      "rich_text",
-      {
-        eyebrow: L("Company story", "Notre histoire", "قصة الشركة"),
-        title: L("Our story", "Notre histoire", "قصتنا"),
-        body: PH,
-        link_label: {},
-        link_url: "",
-      },
-      { placeholder: true },
-    ),
-    section(
-      "about",
-      "timeline",
-      {
-        eyebrow: L("Milestones", "Étapes", "محطات"),
-        title: L("Our journey", "Notre parcours", "مسيرتنا"),
-        items: milestones(),
-      },
-      { placeholder: true },
-    ),
-    section(
-      "about",
-      "values",
-      {
-        eyebrow: L("What drives us", "Ce qui nous anime", "ما يحركنا"),
-        title: L("Mission, vision and values", "Mission, vision et valeurs", "المهمة والرؤية والقيم"),
-        items: [
-          { label: L("01", "01", "01"), title: L("Mission", "Mission", "المهمة"), body: PH },
-          { label: L("02", "02", "02"), title: L("Vision", "Vision", "الرؤية"), body: PH },
-          { label: L("03", "03", "03"), title: L("Values", "Valeurs", "القيم"), body: PH },
-        ],
-      },
-      { placeholder: true },
-    ),
+    section("about", "hero", {
+      eyebrow: L("About", "À propos", "من نحن"),
+      title: L("GOODMAX Dz", "GOODMAX Dz", "GOODMAX Dz"),
+      subtitle: L(
+        "International standards, Swedish blades and forward-looking Algerian know-how.",
+        "Des standards internationaux, des lames suédoises et un savoir-faire algérien tourné vers l’avenir.",
+        "معايير دولية، وشفرات سويدية، ودراية جزائرية تتطلع إلى المستقبل.",
+      ),
+      media_url: "/media/still-blade-closeup.jpg",
+      media_type: "image",
+    }),
+    section("about", "rich_text", {
+      eyebrow: L("Our story", "Notre histoire", "قصتنا"),
+      title: L("International quality, Algerian expertise", "Qualité internationale, expertise algérienne", "جودة عالمية، وخبرة جزائرية"),
+      body: L(
+        "GOODMAX builds on a heritage of experience and know-how in shaving and personal care, combining international standards with local manufacturing and a vision centred on quality and innovation.\n\nGOODMAX is manufactured in Algeria by Vistar-Bouti under licence from the parent company, drawing on expertise in import and export built up since 1995, and on an industrial journey that began in 2023 with the opening of its first factory dedicated to disposable razors.\n\nAs the first factory in Africa to make GOODMAX under licence from the parent company, Vistar-Bouti is committed to products that combine technical expertise with manufacturing precision, using blades made in Sweden, a reflection of the brand’s commitment to quality and attention to detail.\n\nVistar-Bouti’s vision goes beyond GOODMAX. It also extends to developing and manufacturing its own local brands, as part of a strategy to strengthen Algerian industry and offer products that meet high quality standards and consumer expectations.",
+        "GOODMAX s’appuie sur un héritage d’expérience et de savoir-faire dans le secteur du rasage et des soins personnels, alliant standards internationaux et fabrication locale, avec une vision axée sur la qualité et l’innovation.\n\nGOODMAX est fabriquée en Algérie par Vistar-Bouti, sous licence de la société mère, bénéficiant d’une expertise acquise depuis 1995 dans le domaine de l’import-export, ainsi que d’un parcours industriel amorcé en 2023 avec la création de sa première usine spécialisée dans la fabrication de rasoirs jetables.\n\nEn tant que première usine en Afrique à fabriquer GOODMAX sous licence de la société mère, Vistar-Bouti s’engage à proposer des produits alliant expertise technique et précision de fabrication, avec des lames fabriquées en Suède, témoignant de l’engagement de la marque en faveur de la qualité et du souci du détail.\n\nLa vision de Vistar-Bouti ne se limite pas à GOODMAX. Elle s’étend également au développement et à la fabrication de ses propres marques locales, dans le cadre d’une stratégie visant à renforcer l’industrie algérienne et à proposer des produits répondant à des exigences élevées de qualité et aux attentes des consommateurs.",
+        "ترتكز GOODMAX على إرث من الخبرة والدراية في مجال الحلاقة والعناية الشخصية، يجمع بين المعايير الدولية والتصنيع المحلي، برؤية تركّز على الجودة والابتكار.\n\nتُصنَّع GOODMAX في الجزائر من طرف Vistar-Bouti بترخيص من الشركة الأم، مستفيدةً من خبرة في مجال الاستيراد والتصدير مكتسبة منذ سنة 1995، ومن مسار صناعي انطلق سنة 2023 بإنشاء أول مصنع لها متخصص في صناعة شفرات الحلاقة أحادية الاستعمال.\n\nوبصفتها أول مصنع في إفريقيا يصنع GOODMAX بترخيص من الشركة الأم، تلتزم Vistar-Bouti بتقديم منتجات تجمع بين الخبرة التقنية ودقة التصنيع، بشفرات مصنوعة في السويد، بما يعكس التزام العلامة بالجودة وبالاهتمام بأدق التفاصيل.\n\nولا تقتصر رؤية Vistar-Bouti على GOODMAX، بل تمتد أيضاً إلى تطوير وتصنيع علاماتها المحلية الخاصة، في إطار استراتيجية تهدف إلى تعزيز الصناعة الجزائرية وتقديم منتجات تستجيب لمتطلبات عالية من الجودة ولتطلعات المستهلكين.",
+      ),
+      link_label: {},
+      link_url: "",
+    }),
+    section("about", "timeline", {
+      eyebrow: L("Milestones", "Étapes", "محطات"),
+      title: L("Our journey", "Notre parcours", "مسيرتنا"),
+      items: milestones(),
+    }),
+    section("about", "values", {
+      eyebrow: L("What drives us", "Ce qui nous anime", "ما يحركنا"),
+      title: L("Mission, vision and values", "Mission, vision et valeurs", "المهمة والرؤية والقيم"),
+      items: [
+        {
+          label: L("01", "01", "01"),
+          title: L("Mission", "Mission", "المهمة"),
+          body: L(
+            "To offer products that combine technical expertise with manufacturing precision.",
+            "Proposer des produits alliant expertise technique et précision de fabrication.",
+            "تقديم منتجات تجمع بين الخبرة التقنية ودقة التصنيع.",
+          ),
+        },
+        {
+          label: L("02", "02", "02"),
+          title: L("Vision", "Vision", "الرؤية"),
+          body: L(
+            "To go beyond GOODMAX by developing and manufacturing local brands that strengthen Algerian industry.",
+            "Aller au-delà de GOODMAX en développant et en fabriquant des marques locales qui renforcent l’industrie algérienne.",
+            "تجاوز GOODMAX نحو تطوير وتصنيع علامات محلية تعزّز الصناعة الجزائرية.",
+          ),
+        },
+        {
+          label: L("03", "03", "03"),
+          title: L("Values", "Valeurs", "القيم"),
+          body: L(
+            "Quality, innovation and attention to detail, combining international standards with local manufacturing.",
+            "Qualité, innovation et souci du détail, en alliant standards internationaux et fabrication locale.",
+            "الجودة والابتكار والاهتمام بأدق التفاصيل، مع الجمع بين المعايير الدولية والتصنيع المحلي.",
+          ),
+        },
+      ],
+    }),
     section("about", "network", {
       eyebrow: L("Coverage", "Couverture", "التغطية"),
       title: L("An ambition for every wilaya.", "Une ambition pour chaque wilaya.", "طموح لكل ولاية."),
@@ -408,14 +411,39 @@ function sections(): PageSection[] {
   ];
 }
 
+/** Milestones from Omar's company text (2026-10-10). */
 function milestones() {
-  const body = L("Milestone details to be added.", "Détails de l'étape à ajouter.", "تفاصيل المحطة ستضاف لاحقاً.");
-  const title = L("Milestone title", "Titre de l'étape", "عنوان المحطة");
   return [
-    { year: L("2017", "2017", "2017"), title, body, visible: true },
-    { year: L("2020", "2020", "2020"), title, body, visible: true },
-    { year: L("2023", "2023", "2023"), title, body, visible: true },
-    { year: L("Now", "Aujourd'hui", "اليوم"), title, body, visible: true },
+    {
+      year: L("1995", "1995", "1995"),
+      title: L("Import and export", "Import-export", "الاستيراد والتصدير"),
+      body: L(
+        "Vistar-Bouti starts building its expertise in import and export.",
+        "Début de l’expertise de Vistar-Bouti dans le domaine de l’import-export.",
+        "بداية اكتساب Vistar-Bouti لخبرتها في مجال الاستيراد والتصدير.",
+      ),
+      visible: true,
+    },
+    {
+      year: L("2023", "2023", "2023"),
+      title: L("First factory", "Première usine", "أول مصنع"),
+      body: L(
+        "Vistar-Bouti opens its first factory dedicated to disposable razors, the first in Africa to make GOODMAX under licence from the parent company.",
+        "Création de la première usine spécialisée dans la fabrication de rasoirs jetables, la première en Afrique à fabriquer GOODMAX sous licence de la société mère.",
+        "إنشاء أول مصنع متخصص في صناعة شفرات الحلاقة أحادية الاستعمال، وهو أول مصنع في إفريقيا يصنع GOODMAX بترخيص من الشركة الأم.",
+      ),
+      visible: true,
+    },
+    {
+      year: L("Today", "Aujourd’hui", "اليوم"),
+      title: L("Made in Algeria", "Fabriquée en Algérie", "صُنع في الجزائر"),
+      body: L(
+        "GOODMAX is made in Algeria, with blades made in Sweden.",
+        "GOODMAX est fabriquée en Algérie, avec des lames fabriquées en Suède.",
+        "تُصنع GOODMAX في الجزائر بشفرات مصنوعة في السويد.",
+      ),
+      visible: true,
+    },
   ];
 }
 
