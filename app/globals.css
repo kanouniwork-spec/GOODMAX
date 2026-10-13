@@ -49,6 +49,14 @@
 [dir="rtl"] {
   --f-display: var(--font-arabic), "IBM Plex Sans Arabic", system-ui, sans-serif;
   --f-body: var(--font-arabic), "IBM Plex Sans Arabic", system-ui, sans-serif;
+  /* the mono face has no Arabic letters, and spaced-out letters break Arabic joins */
+  --f-mono: var(--font-arabic), "IBM Plex Sans Arabic", system-ui, sans-serif;
+}
+[dir="rtl"] :is(.product-card__brand, .loc-card small, .values__item span, .brand-card__top, .demo-chip, .story__hud, .story__skip, .story__loading) {
+  letter-spacing: 0;
+}
+[dir="rtl"] :is(.product-card__brand, .loc-card small) {
+  font-size: 13px; /* Arabic is unreadable at the 11-12px used for the Latin labels */
 }
 
 *,
@@ -97,6 +105,7 @@ h4 {
   font-weight: 700;
   line-height: 1.04;
   letter-spacing: -0.025em;
+  overflow-wrap: break-word;
 }
 [dir="rtl"] h1,
 [dir="rtl"] h2,
@@ -148,6 +157,13 @@ p {
   max-width: calc(var(--container) + var(--gutter) * 2);
   margin-inline: auto;
   padding-inline: var(--gutter);
+}
+/* viewport-fit=cover lets the page run under a phone's notch in landscape; keep content clear of it */
+@supports (padding: max(0px)) {
+  .container {
+    padding-left: max(var(--gutter), env(safe-area-inset-left));
+    padding-right: max(var(--gutter), env(safe-area-inset-right));
+  }
 }
 .section {
   position: relative;
@@ -291,6 +307,9 @@ p {
   border-color: #fff;
   --btn-bg: rgba(255, 255, 255, 0.06);
 }
+.arrow {
+  display: inline-block; /* so the Arabic flip below also applies inside plain links */
+}
 .btn .arrow {
   transition: transform var(--d-base) var(--ease);
 }
@@ -302,6 +321,14 @@ p {
 }
 [dir="rtl"] .btn:hover .arrow {
   transform: scaleX(-1) translateX(3px);
+}
+@media (max-width: 560px) {
+  /* long French labels wrap inside the button instead of pushing past the edge of the screen */
+  .btn {
+    white-space: normal;
+    text-align: center;
+    padding: 10px 22px;
+  }
 }
 .text-link {
   display: inline-flex;
@@ -517,8 +544,10 @@ html[data-header="over-video"] .lang-switch button[aria-pressed="true"] {
   color: var(--c-text);
   display: flex;
   flex-direction: column;
-  padding: 20px var(--gutter) 32px;
+  padding: 20px var(--gutter) max(32px, env(safe-area-inset-bottom));
   box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .drawer__top {
   display: flex;
@@ -545,6 +574,15 @@ html[data-header="over-video"] .lang-switch button[aria-pressed="true"] {
 }
 .drawer nav a[aria-current="page"] {
   color: var(--c-primary);
+}
+@media (max-height: 560px) {
+  .drawer__top {
+    margin-bottom: 12px;
+  }
+  .drawer nav a {
+    padding: 10px 0;
+    font-size: 22px;
+  }
 }
 .drawer .lang-switch {
   display: inline-flex;
@@ -676,8 +714,24 @@ main {
   }
 }
 @media (max-width: 560px) {
+  .site-footer {
+    padding: 64px 0 32px;
+  }
   .site-footer__grid {
     grid-template-columns: 1fr;
+    gap: 36px;
+  }
+  .site-footer .site-footer__nav {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 24px;
+  }
+  .site-footer .site-footer__langs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+  }
+  .site-footer__bottom {
+    margin-top: 44px;
   }
 }
 
@@ -775,6 +829,7 @@ main {
   font-size: 11px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
+  white-space: nowrap;
   pointer-events: none;
 }
 [dir="rtl"] .story__hint {
@@ -1028,6 +1083,12 @@ main {
   }
 }
 
+@media (max-height: 500px) {
+  .story__intro img {
+    width: min(420px, 60vw);
+  }
+}
+
 /* reduced motion: static poster + list */
 .story--static {
   background: var(--c-ink);
@@ -1138,9 +1199,17 @@ main {
   color: var(--c-muted);
   white-space: pre-line;
 }
+.editorial__aside {
+  position: sticky;
+  top: calc(var(--header-h) + 32px);
+}
 @media (max-width: 860px) {
   .editorial {
     grid-template-columns: 1fr;
+  }
+  /* stacked above the form, a sticky intro would slide over the fields */
+  .editorial__aside {
+    position: static;
   }
 }
 
@@ -1244,6 +1313,22 @@ main {
   font-weight: 600;
   font-size: 14px;
 }
+@media (max-width: 760px) {
+  .brand-rail {
+    gap: 14px;
+  }
+  .brand-card {
+    min-height: 250px;
+    gap: 28px;
+    padding: 24px;
+  }
+  .brand-card__logo {
+    height: 48px;
+  }
+  .brand-card__cta {
+    margin-top: 16px;
+  }
+}
 
 /* timeline */
 .timeline {
@@ -1251,6 +1336,9 @@ main {
   display: grid;
   grid-template-columns: repeat(var(--cols, 4), 1fr);
   gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 .timeline::before {
   content: "";
@@ -1496,7 +1584,13 @@ main {
 }
 @media (max-width: 760px) {
   .cta-band {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .cta-band {
+    padding: 36px 24px;
+    gap: 28px;
   }
 }
 
@@ -1524,6 +1618,27 @@ main {
   background: var(--c-navy);
   border-color: var(--c-navy);
   color: #fff;
+}
+@media (max-width: 760px) {
+  .filter-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: calc(var(--gutter) * -1);
+    padding: 2px var(--gutter);
+    scroll-padding-inline: var(--gutter);
+    scrollbar-width: none;
+    margin-bottom: 28px;
+  }
+  .filter-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .chip {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    white-space: nowrap;
+  }
 }
 .product-list {
   display: grid;
@@ -1566,6 +1681,7 @@ main {
   display: block;
   height: min(480px, 70vw);
   width: auto;
+  object-fit: contain; /* a wide photo is narrowed by max-width; this keeps it from being squashed */
   border-radius: 14px;
   transition: transform 450ms var(--ease);
   mask-image: radial-gradient(ellipse 55% 60% at 50% 50%, #000 60%, transparent 100%);
@@ -1746,6 +1862,25 @@ main {
     min-height: 440px;
   }
 }
+@media (max-width: 560px) {
+  .product-card__stage {
+    min-height: 390px;
+  }
+  .product-float img {
+    height: min(480px, 76vw);
+  }
+  .product-card__body {
+    padding: 26px 22px 30px;
+  }
+  .product-card__desc {
+    font-size: 16px;
+  }
+  .product-zoom {
+    top: 12px;
+    inset-inline-end: 12px;
+    padding: 9px 14px;
+  }
+}
 
 /* forms */
 .form-card {
@@ -1795,7 +1930,7 @@ main {
   border: 1px solid var(--c-border);
   background: var(--c-bg);
   transition: border-color var(--d-fast), box-shadow var(--d-fast);
-  font-size: 15.5px;
+  font-size: 16px;
 }
 .field textarea {
   min-height: 150px;
@@ -1830,10 +1965,11 @@ main {
 }
 .hp {
   position: absolute;
-  left: -9999px;
   width: 1px;
   height: 1px;
   overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* locations / contact */
@@ -1881,6 +2017,13 @@ main {
   font-size: 14px;
   color: var(--c-muted);
 }
+.loc-card .text-link,
+.loc-card [dir="ltr"] {
+  justify-self: start; /* underline the label only; phone numbers sit on the reading side in Arabic too */
+}
+.contact-info [dir="ltr"] {
+  width: fit-content;
+}
 .map-frame {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -1900,6 +2043,12 @@ main {
 @media (max-width: 900px) {
   .loc-layout {
     grid-template-columns: 1fr;
+  }
+  /* no scroll box inside the page on phones; the list just flows */
+  .loc-list {
+    max-height: none;
+    overflow: visible;
+    padding-inline-end: 0;
   }
 }
 .contact-grid {
@@ -2098,11 +2247,16 @@ main {
   animation-play-state: paused;
 }
 [dir="rtl"] .brand-marquee__track {
-  animation-direction: reverse;
+  animation-name: brand-marquee-rtl;
 }
 @keyframes brand-marquee {
   to {
     transform: translateX(calc(-100% - var(--marquee-gap)));
+  }
+}
+@keyframes brand-marquee-rtl {
+  to {
+    transform: translateX(calc(100% + var(--marquee-gap)));
   }
 }
 .brand-logo {

@@ -26,7 +26,7 @@ export async function Footer() {
           </div>
           <div>
             <h2>{t("footer.navigation")}</h2>
-            <ul>
+            <ul className="site-footer__nav">
               {NAV.map((n) => (
                 <li key={n.href}>
                   <Link href={n.href}>{t(n.key)}</Link>
@@ -52,7 +52,9 @@ export async function Footer() {
               {address && <li className="muted">{address}</li>}
               {!general.general_email && !general.phone && !address && <li className="muted">{t("contact.pending")}</li>}
               <li>
-                <Link href="/contact">{t("nav.contact")} →</Link>
+                <Link href="/contact">
+                  {t("nav.contact")} <span className="arrow">→</span>
+                </Link>
               </li>
             </ul>
           </div>
@@ -72,7 +74,7 @@ export async function Footer() {
             {footer.show_languages && (
               <>
                 <h2>{t("footer.languages")}</h2>
-                <ul>
+                <ul className="site-footer__langs">
                   {general.enabled_locales.map((l) => (
                     <li key={l} lang={l} className={l === locale ? undefined : "muted"}>
                       {LOCALE_META[l].native}

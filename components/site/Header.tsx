@@ -82,40 +82,44 @@ export function Header({ nav, locale, locales, logo, logoLight, siteName, labels
   }, [open, close]);
 
   return (
-    <header className="site-header">
-      <div className="container site-header__inner">
-        <Link href="/" className="site-header__logo" aria-label={siteName}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="logo-dark" src={logo} alt={siteName} width={148} height={34} />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="logo-light" src={logoLight} alt="" aria-hidden width={148} height={34} />
-        </Link>
-        <nav className="site-nav" aria-label={labels.primary}>
-          <ul>
-            {nav.map((n) => (
-              <li key={n.href}>
-                <Link href={n.href} aria-current={isActive(n.href) ? "page" : undefined}>
-                  {n.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <LangSwitch locale={locale} locales={locales} label={labels.language} />
-          <button
-            ref={menuBtn}
-            type="button"
-            className="menu-btn"
-            aria-expanded={open}
-            aria-controls="mobile-drawer"
-            aria-label={labels.menu}
-            onClick={() => setOpen(true)}
-          >
-            <span />
-          </button>
+    <>
+      <header className="site-header">
+        <div className="container site-header__inner">
+          <Link href="/" className="site-header__logo" aria-label={siteName}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="logo-dark" src={logo} alt={siteName} width={148} height={34} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="logo-light" src={logoLight} alt="" aria-hidden width={148} height={34} />
+          </Link>
+          <nav className="site-nav" aria-label={labels.primary}>
+            <ul>
+              {nav.map((n) => (
+                <li key={n.href}>
+                  <Link href={n.href} aria-current={isActive(n.href) ? "page" : undefined}>
+                    {n.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <LangSwitch locale={locale} locales={locales} label={labels.language} />
+            <button
+              ref={menuBtn}
+              type="button"
+              className="menu-btn"
+              aria-expanded={open}
+              aria-controls="mobile-drawer"
+              aria-label={labels.menu}
+              onClick={() => setOpen(true)}
+            >
+              <span />
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
+      {/* The drawer sits outside the header: the header's backdrop-filter would otherwise make it the drawer's
+        containing block, shrinking the full-screen menu to the header's 72px height. */}
       {open && (
         <>
           <div className="drawer-backdrop" onClick={close} />
@@ -145,6 +149,6 @@ export function Header({ nav, locale, locales, logo, logoLight, siteName, labels
           </div>
         </>
       )}
-    </header>
+    </>
   );
 }

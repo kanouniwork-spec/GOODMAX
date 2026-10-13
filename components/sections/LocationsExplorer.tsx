@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { osmEmbed } from "@/lib/maps";
 
 export type LocationView = {
@@ -31,6 +31,15 @@ export function LocationsExplorer({
   const list = useMemo(() => (wilaya ? locations.filter((l) => l.wilaya === wilaya) : locations), [wilaya, locations]);
   const [selected, setSelected] = useState(list[0]?.id);
   const sel = list.find((l) => l.id === selected) ?? list[0];
+  const map = useRef<HTMLElement | null>(null);
+  const setMap = (el: HTMLElement | null) => {
+    map.current = el;
+  };
+  const pick = (id: string) => {
+    setSelected(id);
+    // on phones the map sits below the list, so bring it into view
+    if (window.matchMedia("(max-width: 900px)").matches) map.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const wilayas = useMemo(() => {
     const m = new Map<string, string>();
     locations.forEach((l) => l.wilaya && m.set(l.wilaya, l.wilayaLabel));
@@ -54,7 +63,7 @@ export function LocationsExplorer({
       <div className="loc-layout">
         <div className="loc-list">
           {list.map((l) => (
-            <button key={l.id} type="button" className="loc-card" aria-pressed={sel?.id === l.id} onClick={() => setSelected(l.id)}>
+            <button key={l.id} type="button" className="loc-card" aria-pressed={sel?.id === l.id} onClick={() => pick(l.id)}>
               <small>
                 {l.type} · {l.wilayaLabel}
               </small>
@@ -72,16 +81,16 @@ export function LocationsExplorer({
               )}
               {l.mapsUrl && (
                 <a className="text-link" href={l.mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                  {labels.directions} →
+                  {labels.directions} <span className="arrow">→</span>
                 </a>
               )}
             </button>
           ))}
         </div>
         {sel?.lat != null && sel?.lng != null ? (
-          <iframe key={sel.id} className="map-frame" title={`${labels.map}: ${sel.name}`} src={osmEmbed(sel.lat, sel.lng)} loading="lazy" />
+          <iframe key={sel.id} ref={setMap} className="map-frame" title={`${labels.map}: ${sel.name}`} src={osmEmbed(sel.lat, sel.lng)} loading="lazy" />
         ) : (
-          <div className="map-frame empty" style={{ display: "grid", placeItems: "center" }}>
+          <div ref={setMap} className="map-frame empty" style={{ display: "grid", placeItems: "center" }}>
             {labels.map}
           </div>
         )}

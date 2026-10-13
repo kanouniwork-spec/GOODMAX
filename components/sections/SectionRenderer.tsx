@@ -9,6 +9,7 @@ import { ALGERIA_OUTLINE } from "@/data/wilayas";
 import { VideoStory, type StoryStage } from "./VideoStory";
 import { ProductStage } from "./ProductCard";
 import { TimelineProgress } from "./TimelineProgress";
+import { ChipBar } from "./ChipBar";
 import { ContactForm, DistributorForm } from "./forms";
 import { LocationsExplorer } from "./LocationsExplorer";
 import { PLATFORM_NAMES, SocialIcon } from "@/components/site/SocialIcon";
@@ -224,7 +225,7 @@ export async function SectionRenderer({
             <span id="products" className="anchor" />
             <Head x={x} />
             {brandsWithProducts.length > 0 && (
-              <nav className="filter-bar" aria-label={t("products.filter")}>
+              <ChipBar label={t("products.filter")}>
                 <Link className="chip" href="/products#products" scroll={false} aria-current={!brand}>
                   {t("products.all")}
                 </Link>
@@ -233,7 +234,7 @@ export async function SectionRenderer({
                     {loc(b.name_json, locale)}
                   </Link>
                 ))}
-              </nav>
+              </ChipBar>
             )}
             {list.length === 0 ? (
               <p className="empty">{t("products.empty")}</p>
@@ -327,7 +328,7 @@ export async function SectionRenderer({
         <section className="section section--surface" id={anchor}>
           <div className="container">
             <Head x={x} />
-            <ol className="timeline" style={{ ["--cols" as string]: Math.max(1, Math.min(items.length, 5)), listStyle: "none", margin: 0, padding: 0 }}>
+            <ol className="timeline" style={{ ["--cols" as string]: Math.max(1, Math.min(items.length, 5)) }}>
               <TimelineProgress />
               {items.map((it, i) => (
                 <li key={i} className="timeline__item reveal" style={{ transitionDelay: `${i * 120}ms` }}>
@@ -481,7 +482,7 @@ export async function SectionRenderer({
       return (
         <section className="section" id={anchor} style={{ paddingTop: 0 }}>
           <div className="container editorial">
-            <div className="reveal" style={{ position: "sticky", top: "calc(var(--header-h) + 32px)" }}>
+            <div className="editorial__aside reveal">
               <Head x={x} className="display-md" />
             </div>
             <div className="form-card reveal">
@@ -583,7 +584,7 @@ export async function SectionRenderer({
                     <p style={{ whiteSpace: "pre-line" }}>{address}</p>
                     {general.factory_maps_url && (
                       <a className="text-link" href={general.factory_maps_url} target="_blank" rel="noopener noreferrer" style={{ marginTop: 8 }}>
-                        {t("contact.open_maps")} →
+                        {t("contact.open_maps")} <Arrow />
                       </a>
                     )}
                   </div>
