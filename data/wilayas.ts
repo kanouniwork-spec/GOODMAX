@@ -1,13 +1,13 @@
 /**
  * Seed for the editable `wilayas` table.
  *
- * Contains the 58 wilayas (codes 01–58) whose names were verified when this
- * seed was written. GOODMAX targets 69 wilayas: codes 59–69 are created as
- * inactive "pending" rows so the owner can enter the official names in
- * Admin › Locations & Maps › Wilaya dataset instead of the site silently
- * using an outdated list. Municipality lists start empty and can be pasted
- * per wilaya in the same screen; the distributor form accepts free text
- * until a list exists.
+ * Contains all 69 wilayas. Codes 59–69 were created by law n° 26-06 of
+ * 4 April 2026; their names and numbers follow presidential decree n° 26-206
+ * of 25 May 2026 (Journal officiel n° 40, 3 June 2026). If the target grows
+ * again, codes beyond this list are created as inactive "pending" rows so the
+ * owner can enter the official names in Admin › Locations & Maps › Wilaya
+ * dataset. Municipality lists start empty and can be pasted per wilaya in the
+ * same screen; the distributor form accepts free text until a list exists.
  *
  * Coordinates are approximate capital-city positions, used only to draw the
  * network visual.
@@ -73,6 +73,17 @@ const ROWS: Row[] = [
   [56, "Djanet", "Djanet", "جانت", 24.55, 9.48],
   [57, "El M'Ghair", "El M'Ghair", "المغير", 33.95, 5.92],
   [58, "El Meniaa", "El Meniaa", "المنيعة", 30.58, 2.88],
+  [59, "Aflou", "Aflou", "أفلو", 34.11, 2.1],
+  [60, "Barika", "Barika", "بريكة", 35.39, 5.37],
+  [61, "El Kantara", "El Kantara", "القنطرة", 35.22, 5.71],
+  [62, "Bir El Ater", "Bir El Ater", "بئر العاتر", 34.74, 8.06],
+  [63, "El Aricha", "El Aricha", "العريشة", 34.22, -1.27],
+  [64, "Ksar Chellala", "Ksar Chellala", "قصر الشلالة", 35.21, 2.32],
+  [65, "Aïn Oussara", "Aïn Oussara", "عين وسارة", 35.45, 2.91],
+  [66, "Messaad", "Messaad", "مسعد", 34.15, 3.5],
+  [67, "Ksar El Boukhari", "Ksar El Boukhari", "قصر البخاري", 35.89, 2.75],
+  [68, "Bou Saâda", "Bou Saâda", "بوسعادة", 35.21, 4.18],
+  [69, "El Abiodh Sidi Cheikh", "El Abiodh Sidi Cheikh", "الأبيض سيدي الشيخ", 32.9, 0.54],
 ];
 
 export const WILAYA_TARGET = 69;

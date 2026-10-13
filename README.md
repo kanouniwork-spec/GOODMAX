@@ -49,8 +49,8 @@ The file backend is not suitable for Vercel (the filesystem there is temporary; 
 - Every editable item has a draft and a published version; visitors only see published content. Publish per language from the editor or all at once from the Publishing center. Signed-in users can preview drafts.
 - Placeholder content is flagged in the admin (orange "placeholder" badge) and listed on the dashboard under "Still needed from GOODMAX".
 - Missing translations fall back to English.
-- Wilayas 59–69 exist as blank, inactive rows until official names are entered.
+- All 69 wilayas are in the dataset. Codes 59–69 use the official names from presidential decree n° 26-206 of 25 May 2026. A location saved in any wilaya lights that wilaya up on the network map.
 
 ## Scroll video
 
-`components/sections/VideoStory.tsx`: sticky full-screen video whose time follows scroll position (smoothed with requestAnimationFrame), logo intro, four callout stages with editable timing (from/to % of the video) and position, progress bar and 01/04 counter. Mobile gets a 720p file; browsers without H.264 get the WebM file; reduced-motion users see a still image with the callouts listed. The video files were encoded with a keyframe every 4 frames so scrubbing stays smooth (`scripts/prepare-media.sh`).
+`components/sections/VideoStory.tsx`: sticky full-screen video whose time follows scroll position (smoothed with requestAnimationFrame), logo intro, four callout stages with editable timing (from/to % of the video) and position, progress bar and 01/04 counter. Mobile gets a 720p file; browsers without H.264 get the WebM file; reduced-motion users see a still image with the callouts listed. The video is played for a moment and paused as soon as it loads (or on the first tap if the phone blocks that, as in iPhone Low Power Mode), because iPhones only paint scrubbed frames after a video has played, and phones on mobile data only buffer the whole file once it has. The video files were encoded with a keyframe every 4 frames so scrubbing stays smooth (`scripts/prepare-media.sh`).

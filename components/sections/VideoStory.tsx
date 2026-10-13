@@ -41,6 +41,7 @@ export function VideoStory(props: Props) {
   const counter = useRef<HTMLElement>(null);
   const callouts = useRef<(HTMLDivElement | null)[]>([]);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [reduced, setReduced] = useState(false);
   const stagesRef = useRef(stages);
   stagesRef.current = stages;
@@ -75,6 +76,13 @@ export function VideoStory(props: Props) {
     const small = window.matchMedia("(max-width: 767px)").matches;
     let src = small && props.mobileVideoUrl ? props.mobileVideoUrl : props.videoUrl;
     if (props.webmUrl && !v.canPlayType("video/mp4")) src = props.webmUrl;
+    // Phones only play silent inline video without a tap when these are set before it loads.
+    // React sets `muted` as a property only, so write the attributes as well.
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute("muted", "");
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
     if (v.getAttribute("src") !== src) {
       v.src = src;
       v.load();
@@ -86,54 +94,100 @@ export function VideoStory(props: Props) {
     let raf = 0;
     let running = false;
     let headerState = "";
+    let shown = false;
+    let seekAt = 0;
 
     const onMeta = () => {
       duration = Number.isFinite(v.duration) ? v.duration : 0;
     };
-    const onData = () => {
+    // Show the video once any frame can be painted. iPhones may hold back `loadeddata` until the
+    // video has played, so a finished seek or a played frame counts too.
+    const onFrame = () => {
       onMeta();
+      if (shown || v.readyState < 2) return;
+      shown = true;
       setReady(true);
     };
+
+    // iPhones only paint seeked frames after the video has played once, so play it for a moment and
+    // pause. Silent inline video may start without a tap; when the phone refuses (Low Power Mode),
+    // try again on the visitor's first tap or key press.
+    let primed = false;
+    let priming = false;
+    let attempt = 0;
+    const gestures = ["touchend", "pointerup", "click", "keydown"];
+    const bind = () => gestures.forEach((g) => window.addEventListener(g, prime, { capture: true, passive: true }));
+    const unbind = () => gestures.forEach((g) => window.removeEventListener(g, prime, true));
+    const prime = () => {
+      if (primed || priming) return;
+      priming = true;
+      const mine = ++attempt;
+      let started: Promise<void> | undefined;
+      try {
+        started = v.play();
+      } catch {
+        priming = false;
+        return;
+      }
+      Promise.resolve(started).then(
+        () => {
+          if (mine !== attempt) return;
+          priming = false;
+          primed = true;
+          v.pause();
+          unbind();
+          onFrame();
+        },
+        () => {
+          if (mine === attempt) priming = false;
+        },
+      );
+    };
+
     // Browsers without H.264 (some Linux/Firefox builds) fall back to the WebM file.
     const onError = () => {
       if (props.webmUrl && v.getAttribute("src") !== props.webmUrl) {
         v.src = props.webmUrl;
         v.load();
+        primed = false;
+        priming = false;
+        bind();
+        prime();
+      } else if (!shown) {
+        setFailed(true);
       }
     };
+    const frameEvents = ["loadeddata", "canplay", "seeked", "playing", "timeupdate"];
     v.addEventListener("error", onError);
     v.addEventListener("loadedmetadata", onMeta);
-    v.addEventListener("loadeddata", onData);
+    v.addEventListener("durationchange", onMeta);
+    frameEvents.forEach((e) => v.addEventListener(e, onFrame));
+    bind();
     if (v.readyState >= 1) onMeta();
-    if (v.readyState >= 2) onData();
-
-    // iOS Safari only renders seeks after the element has been "activated" once.
-    const prime = () => {
-      v.play()
-        .then(() => v.pause())
-        .catch(() => {});
-      window.removeEventListener("touchstart", prime);
-    };
-    window.addEventListener("touchstart", prime, { passive: true, once: true });
+    onFrame();
+    prime();
 
     const frame = () => {
       raf = 0;
+      const now = performance.now();
       const rect = sec.getBoundingClientRect();
       const vh = window.innerHeight;
       const total = Math.max(1, sec.offsetHeight - vh);
       const p = clamp(-rect.top / total);
 
-      // Video: ease toward the target time; skip while a seek is still in flight.
+      // Video: ease toward the target time; skip while a seek is still in flight, unless it hung.
       if (duration) {
         const target = p * Math.max(0, duration - 0.04);
         current += (target - current) * 0.22;
         if (Math.abs(target - current) < 0.002) current = target;
-        if (!v.seeking && Math.abs(v.currentTime - current) > 1 / 90) {
+        if (Math.abs(v.currentTime - current) > 1 / 90 && (!v.seeking || now - seekAt > 1000)) {
           try {
             v.currentTime = current;
+            seekAt = now;
           } catch {}
         }
       }
+      if (!shown) onFrame();
 
       // Intro logo fades and lifts away during the first few percent.
       if (intro.current) {
@@ -146,6 +200,7 @@ export function VideoStory(props: Props) {
       // Feature callouts
       const span = (STAGE_END - STAGE_START) / Math.max(1, stagesRef.current.length);
       let active = -1;
+      let passed = 0;
       callouts.current.forEach((el, i) => {
         if (!el) return;
         // Each stage shows during its own slice of the story (editable in Admin), else an even split.
@@ -157,14 +212,17 @@ export function VideoStory(props: Props) {
         const out = clamp((1 - local) / 0.2);
         const o = local < 0 || local > 1 ? 0 : Math.min(inn, out);
         if (local >= 0 && local <= 1) active = i;
+        if (p >= from) passed = i;
         el.style.opacity = String(o);
         el.style.setProperty("--shift", `${(1 - o) * 24}px`);
         const line = el.querySelector<HTMLElement>(".callout__line");
         if (line) line.style.transform = `scaleX(${inn})`;
       });
-      if (active !== lastStage && counter.current) {
-        lastStage = active;
-        counter.current.textContent = String(Math.max(1, active + 1)).padStart(2, "0");
+      // Between and after stages the counter keeps the last one shown.
+      const stage = active >= 0 ? active : passed;
+      if (stage !== lastStage && counter.current) {
+        lastStage = stage;
+        counter.current.textContent = String(stage + 1).padStart(2, "0");
       }
       if (bar.current) bar.current.style.transform = `scaleX(${p})`;
       if (hud.current) hud.current.classList.toggle("is-on", p > 0.02 && p < 0.995);
@@ -198,8 +256,9 @@ export function VideoStory(props: Props) {
       io.disconnect();
       v.removeEventListener("error", onError);
       v.removeEventListener("loadedmetadata", onMeta);
-      v.removeEventListener("loadeddata", onData);
-      window.removeEventListener("touchstart", prime);
+      v.removeEventListener("durationchange", onMeta);
+      frameEvents.forEach((e) => v.removeEventListener(e, onFrame));
+      unbind();
       delete root.dataset.header;
     };
   }, [reduced, props.videoUrl, props.mobileVideoUrl, props.webmUrl, props.headerOverVideo, stages.length]);
@@ -269,7 +328,6 @@ export function VideoStory(props: Props) {
           disableRemotePlayback
           aria-hidden="true"
           tabIndex={-1}
-          poster={props.poster}
         />
         <div className="story__grid" />
         <div className="story__shade" />
@@ -302,7 +360,7 @@ export function VideoStory(props: Props) {
             </ul>
           </div>
         ))}
-        {!ready && <div className="story__loading">{labels.loading}…</div>}
+        {!ready && !failed && <div className="story__loading">{labels.loading}…</div>}
         <div className="story__hud" ref={hud}>
           <span className="story__counter" aria-hidden="true">
             <b ref={counter}>01</b> / {String(stages.length).padStart(2, "0")}
