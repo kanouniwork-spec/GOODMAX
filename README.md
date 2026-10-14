@@ -37,7 +37,7 @@ The file backend is not suitable for Vercel (the filesystem there is temporary; 
 
 ## Structure
 
-- `app/(site)` public pages: `/`, `/about`, `/brands`, `/products`, `/distributors`, `/locations`, `/contact`
+- `app/(site)/[locale]` public pages: `/`, `/about`, `/brands`, `/products`, `/distributors`, `/locations`, `/contact` (the `[locale]` part never shows in the address, see Speed below)
 - `app/admin` login + panel: dashboard, page builder, brands, products, distributor requests & contact inbox, media library, social links, locations & wilayas, users & roles, settings, appearance, SEO, marketing pixels, translations, publishing center
 - `components/sections` section renderers incl. `VideoStory.tsx` (the scroll video)
 - `lib/data` storage layer, `lib/auth` sessions/roles, `lib/i18n` languages, `lib/content` draft/publish logic
@@ -50,6 +50,13 @@ The file backend is not suitable for Vercel (the filesystem there is temporary; 
 - Placeholder content is flagged in the admin (orange "placeholder" badge) and listed on the dashboard under "Still needed from GOODMAX".
 - Missing translations fall back to English.
 - All 69 wilayas are in the dataset. Codes 59–69 use the official names from presidential decree n° 26-206 of 25 May 2026. A location saved in any wilaya lights that wilaya up on the network map.
+
+## Speed
+
+- Public pages are built once per language and served ready-made from Vercel's cache, so a visit runs no code and no database query. Addresses stay plain (`/products`): `middleware.ts` serves the copy for the visitor's language (their saved choice, a `?lang=` link, or `default` before they choose, which means Settings › default language). `/products?brand=x` is served from its own cached page (`products/[brand]`).
+- Any save, publish or visibility change in Admin refreshes every cached page at once (`revalidatePath` in `app/admin/actions.ts`). Changes made straight in the database show within the hour. Draft preview uses Next.js draft mode, which skips the cache for that admin only.
+- Server code runs in Paris (`vercel.json` regions: `cdg1`), next to the Supabase database, so Admin pages and form submissions do not cross the Atlantic.
+- Photos uploaded in Admin are shown through the Next.js image optimizer (`lib/media.ts`): resized WebP instead of the original file.
 
 ## Scroll video
 

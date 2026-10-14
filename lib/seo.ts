@@ -7,8 +7,8 @@ import { LOCALES } from "@/types/content";
 
 export const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")).replace(/\/$/, "");
 
-export async function buildMetadata(route: string): Promise<Metadata> {
-  const [locale, entries, general] = await Promise.all([getLocale(), db().list("seo_entries"), db().getSetting("general")]);
+export async function buildMetadata(route: string, bucket: string): Promise<Metadata> {
+  const [locale, entries, general] = await Promise.all([getLocale(bucket), db().list("seo_entries"), db().getSetting("general")]);
   const e = entries.find((x) => x.route === route);
   const title = loc(e?.title_json, locale) || general.site_name;
   const description = loc(e?.description_json, locale) || loc(general.tagline_json, locale);

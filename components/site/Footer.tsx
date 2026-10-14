@@ -5,8 +5,8 @@ import { getSetting, getSocials } from "@/lib/content/queries";
 import { NAV } from "@/lib/nav";
 import { PLATFORM_NAMES, SocialIcon } from "./SocialIcon";
 
-export async function Footer() {
-  const { locale, t } = await getI18n();
+export async function Footer({ bucket }: { bucket: string }) {
+  const { locale, t } = await getI18n(bucket);
   const [footer, general, appearance, socials] = await Promise.all([
     getSetting("footer"),
     getSetting("general"),

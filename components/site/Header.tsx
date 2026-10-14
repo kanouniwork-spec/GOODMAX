@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Locale } from "@/types/content";
-import { LOCALE_META } from "@/lib/i18n";
-import { setLocaleAction } from "@/app/actions/public";
+import { LOCALE_COOKIE, LOCALE_META } from "@/lib/i18n";
 
 type Props = {
   nav: { href: string; label: string }[];
@@ -17,17 +16,21 @@ type Props = {
   labels: { menu: string; close: string; primary: string; language: string };
 };
 
+/**
+ * Each language is its own cached copy of the page (see middleware.ts), so switching saves the choice
+ * and loads the page again. A ?lang= in the address would win over the saved choice, so it is dropped.
+ */
 export function LangSwitch({ locale, locales, label }: { locale: Locale; locales: Locale[]; label: string }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
+  const [pending, setPending] = useState(false);
   const change = (l: Locale) => {
     if (l === locale) return;
+    setPending(true);
     document.documentElement.lang = l;
     document.documentElement.dir = LOCALE_META[l].dir;
-    start(async () => {
-      await setLocaleAction(l);
-      router.refresh();
-    });
+    document.cookie = `${LOCALE_COOKIE}=${l}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("lang");
+    window.location.replace(url);
   };
   return (
     <div className="lang-switch" role="group" aria-label={label} aria-busy={pending}>

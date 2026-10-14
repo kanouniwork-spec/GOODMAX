@@ -1,16 +1,20 @@
 import "server-only";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { draftMode } from "next/headers";
 import type { Brand, PageSection, PageSlug, Product } from "@/types/content";
 import { db } from "@/lib/data";
 import { currentUser } from "@/lib/auth/session";
 import { view } from "./publish";
 
+/** Cookie of the preview switch used before Next.js draft mode; only cleared now. */
 export const PREVIEW_COOKIE = "gm_preview";
 
-/** Draft preview is only honoured for signed-in admin users. */
+/**
+ * Draft preview (turned on by /api/preview) is only honoured for signed-in admin users.
+ * Draft mode skips the page cache, so cached pages never contain drafts.
+ */
 export const isPreview = cache(async () => {
-  if ((await cookies()).get(PREVIEW_COOKIE)?.value !== "1") return false;
+  if (!(await draftMode()).isEnabled) return false;
   return !!(await currentUser());
 });
 

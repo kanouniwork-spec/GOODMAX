@@ -5,6 +5,7 @@ import { getI18n } from "@/lib/i18n/server";
 import { getBrands, getLocations, getProducts, getSetting, getSocials, getWilayas } from "@/lib/content/queries";
 import { db } from "@/lib/data";
 import { osmEmbed } from "@/lib/maps";
+import { webImage } from "@/lib/media";
 import { ALGERIA_OUTLINE } from "@/data/wilayas";
 import { VideoStory, type StoryStage } from "./VideoStory";
 import { ProductStage } from "./ProductCard";
@@ -82,16 +83,8 @@ function BrandMarquee({ brands, label }: { brands: { id: string; href: string; n
   );
 }
 
-export async function SectionRenderer({
-  section,
-  index,
-  searchParams,
-}: {
-  section: PageSection;
-  index: number;
-  searchParams?: Record<string, string | undefined>;
-}) {
-  const { locale, dict, t } = await getI18n();
+export async function SectionRenderer({ section, index, bucket, brand: brandSlug }: { section: PageSection; index: number; bucket: string; brand?: string }) {
+  const { locale, dict, t } = await getI18n(bucket);
   const x = ctx(section, locale);
   const anchor = `s-${section.id}`;
 
@@ -148,7 +141,7 @@ export async function SectionRenderer({
                   <video src={media} muted playsInline autoPlay loop aria-hidden="true" />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={media} alt="" fetchPriority="high" />
+                  <img src={webImage(media, 1920)} alt="" fetchPriority="high" />
                 )}
               </div>
             )}
@@ -191,7 +184,7 @@ export async function SectionRenderer({
                       style={{ ["--accent" as string]: b.accent_color || undefined, transitionDelay: `${i * 60}ms` }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {b.background_url && <img className="brand-card__bg" src={b.background_url} alt="" loading="lazy" />}
+                      {b.background_url && <img className="brand-card__bg" src={webImage(b.background_url)} alt="" loading="lazy" />}
                       <div className="brand-card__top">
                         <span>{String(i + 1).padStart(2, "0")}</span>
                         {b.is_placeholder && b.slug.startsWith("demo-") ? <span className="demo-chip">{t("common.demo")}</span> : <span>{count > 0 ? `${count}` : ""}</span>}
@@ -218,7 +211,6 @@ export async function SectionRenderer({
     /* ------------------------------------------------------------------ */
     case "product_grid": {
       const [products, brands] = await Promise.all([getProducts(), getBrands()]);
-      const brandSlug = searchParams?.brand;
       const brand = brands.find((b) => b.slug === brandSlug);
       const limit = Number(x.c.limit) || 0;
       const list = products.filter((p) => !brand || p.brand_id === brand.id).slice(0, limit || undefined);
@@ -247,7 +239,7 @@ export async function SectionRenderer({
                 {list.map((p) => {
                   const media = [...p.media]
                     .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
-                    .map((m) => ({ type: m.media_type, url: m.url, alt: loc(m.alt_json, locale) || loc(p.name_json, locale) }));
+                    .map((m) => ({ type: m.media_type, url: m.media_type === "image" ? webImage(m.url) : m.url, alt: loc(m.alt_json, locale) || loc(p.name_json, locale) }));
                   const b = brands.find((br) => br.id === p.brand_id);
                   const features = p.features.filter((f) => f.visible);
                   return (
@@ -357,7 +349,7 @@ export async function SectionRenderer({
           <div className="container editorial" style={{ alignItems: "center" }}>
             <div className="hero__media reveal" style={{ order: end ? 2 : 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {img && <img src={img} alt="" loading="lazy" />}
+              {img && <img src={webImage(img)} alt="" loading="lazy" />}
             </div>
             <div className="reveal" style={{ display: "grid", gap: 22 }}>
               {x.L("eyebrow") && <span className="eyebrow">{x.L("eyebrow")}</span>}
@@ -637,7 +629,7 @@ export async function SectionRenderer({
               {items.map((it, i) => (
                 <figure key={i} className="reveal">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={String(it.image_url)} alt={loc(it.caption as LocalizedText, locale)} loading="lazy" />
+                  <img src={webImage(String(it.image_url))} alt={loc(it.caption as LocalizedText, locale)} loading="lazy" />
                   {hasText(it.caption as LocalizedText) && <figcaption>{loc(it.caption as LocalizedText, locale)}</figcaption>}
                 </figure>
               ))}
@@ -686,28 +678,13 @@ const K = 26; // px per degree
 const COS = Math.cos((28 * Math.PI) / 180);
 const project = (lng: number, lat: number): [number, number] => [(lng - LNG0) * K * COS, (LAT1 - lat) * K];
 
-function inside(lng: number, lat: number) {
-  let hit = false;
-  const poly = ALGERIA_OUTLINE;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i];
-    const [xj, yj] = poly[j];
-    if (yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) hit = !hit;
-  }
-  return hit;
-}
-
-let dotCache: [number, number][] | null = null;
-function dots() {
-  if (dotCache) return dotCache;
-  const out: [number, number][] = [];
-  for (let lat = 18.8; lat <= 37.3; lat += 0.42) {
-    for (let lng = -8.8; lng <= 12; lng += 0.42 / COS) {
-      if (inside(lng, lat)) out.push(project(lng, lat));
-    }
-  }
-  return (dotCache = out);
-}
+/**
+ * The dotted country: a grid of dots (one every 0.42° of latitude, the same distance across), painted
+ * as a repeating pattern inside the outline. Drawing each of the ~1,100 dots as its own circle made
+ * the pages showing the map several times heavier to load.
+ */
+const DOT_STEP = 0.42 * K;
+const DOT_ORIGIN = project(-8.8, 18.8);
 
 function NetworkMap({ nodes }: { nodes: { id: string; lat: number | null; lng: number | null; active: boolean; name: string }[] }) {
   const pts = nodes.filter((n) => n.lat != null && n.lng != null).map((n) => ({ ...n, p: project(n.lng!, n.lat!) }));
@@ -736,12 +713,20 @@ function NetworkMap({ nodes }: { nodes: { id: string; lat: number | null; lng: n
           <stop offset="0%" stopColor="#1d5bd8" stopOpacity="0.35" />
           <stop offset="100%" stopColor="#1d5bd8" stopOpacity="0" />
         </radialGradient>
+        <pattern
+          id="nm-dots"
+          patternUnits="userSpaceOnUse"
+          width={DOT_STEP}
+          height={DOT_STEP}
+          x={(DOT_ORIGIN[0] - DOT_STEP / 2).toFixed(2)}
+          y={(DOT_ORIGIN[1] - DOT_STEP / 2).toFixed(2)}
+        >
+          <circle className="dot" cx={DOT_STEP / 2} cy={DOT_STEP / 2} r={1.3} />
+        </pattern>
       </defs>
       <rect width={w} height={h} fill="url(#nm-glow)" />
+      <polygon className="dots" points={outline} fill="url(#nm-dots)" />
       <polygon className="outline" points={outline} />
-      {dots().map(([cx, cy], i) => (
-        <circle key={i} className="dot" cx={cx.toFixed(1)} cy={cy.toFixed(1)} r={1.3} />
-      ))}
       {lines.map(([x1, y1, x2, y2], i) => (
         <line key={i} className="link" x1={x1} y1={y1} x2={x2} y2={y2} />
       ))}

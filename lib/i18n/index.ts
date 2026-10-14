@@ -9,6 +9,11 @@ export const LOCALE_META: Record<Locale, { label: string; native: string; dir: "
 
 export const isLocale = (v: unknown): v is Locale => typeof v === "string" && (LOCALES as readonly string[]).includes(v);
 
+/** The language part of a public page's internal address (see middleware.ts): a chosen language or "default". */
+export const LOCALE_BUCKETS = [...LOCALES, "default"] as const;
+export type LocaleBucket = (typeof LOCALE_BUCKETS)[number];
+export const isLocaleBucket = (v: unknown): v is LocaleBucket => typeof v === "string" && (LOCALE_BUCKETS as readonly string[]).includes(v);
+
 /** Localized value with fallback: requested locale → English → French → first non-empty. */
 export function loc(text: LocalizedText | undefined | null, locale: Locale): string {
   if (!text) return "";

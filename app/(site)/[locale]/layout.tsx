@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import "../globals.css";
+import { notFound } from "next/navigation";
+import "../../globals.css";
 import { fontVars } from "@/lib/fonts";
-import { LOCALE_META, loc } from "@/lib/i18n";
-import { getI18n } from "@/lib/i18n/server";
+import { isLocaleBucket, LOCALE_META, loc } from "@/lib/i18n";
+import { generateLocaleParams, getI18n } from "@/lib/i18n/server";
 import { getSetting, isPreview } from "@/lib/content/queries";
 import { appearanceVars } from "@/lib/appearance";
 import { activePixels } from "@/lib/pixels";
@@ -22,10 +23,20 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+/**
+ * Pages are built once per language and kept ready for every visitor. Saving or publishing in Admin
+ * refreshes them at once (revalidatePath in app/admin/actions.ts); this hourly refresh only catches
+ * changes made straight in the database.
+ */
+export const revalidate = 3600;
+export const generateStaticParams = generateLocaleParams;
+
 export const viewport: Viewport = { themeColor: "#030d1c", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
-export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const { locale, t } = await getI18n();
+export default async function SiteLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: string }> }) {
+  const bucket = (await params).locale;
+  if (!isLocaleBucket(bucket)) notFound(); // e.g. /favicon.ico, which middleware.ts lets through
+  const { locale, t } = await getI18n(bucket);
   const [appearance, general, consent, pixels, preview] = await Promise.all([
     getSetting("appearance"),
     getSetting("general"),
@@ -56,7 +67,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           labels={{ menu: t("nav.menu"), close: t("nav.close"), primary: t("nav.primary"), language: t("nav.language") }}
         />
         <main id="main">{children}</main>
-        <Footer />
+        <Footer bucket={bucket} />
         <RevealObserver />
         <Consent
           pixels={activePixels(pixels)}
@@ -67,6 +78,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         {preview && (
           <div className="preview-bar" role="status">
             {t("preview.banner")}
+            {/* an API route, not a page: the catch-all page makes the lint rule think otherwise */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/api/preview?off=1">{t("preview.exit")}</a>
           </div>
         )}
