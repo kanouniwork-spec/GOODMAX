@@ -1687,6 +1687,12 @@ main {
   mask-image: radial-gradient(ellipse 55% 60% at 50% 50%, #000 60%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 55% 60% at 50% 50%, #000 60%, transparent 100%);
 }
+/* cut-out photos (see-through background) are shown whole, without the edge fade */
+.product-float.is-cutout img {
+  border-radius: 0;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
 .product-float__shadow {
   position: absolute;
   bottom: -18px;
@@ -1726,6 +1732,10 @@ main {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.product-card__thumbs .is-cutout img {
+  object-fit: contain;
+  padding: 3px;
 }
 .product-card__video {
   width: 100%;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Media = { type: "image" | "video"; url: string; alt: string };
 export type ZoomLabels = { zoomIn: string; zoomOut: string; zoomInTouch: string; zoomOutTouch: string };
@@ -12,12 +12,33 @@ const pct = (v: number) => Math.min(100, Math.max(0, v));
 const onControl = (e: { target: EventTarget }) => !!(e.target as Element).closest?.("button");
 
 /**
+ * A cut-out photo (see-through corners) is shown whole: no edge fade on the stage, no crop in its thumbnail.
+ * A photo from another site that can't be read keeps the fade.
+ */
+function isCutout(el: HTMLImageElement) {
+  try {
+    const c = document.createElement("canvas");
+    const n = 32; // fine enough that a product near the edge doesn't blur into a corner
+    c.width = c.height = n;
+    const g = c.getContext("2d", { willReadFrequently: true });
+    if (!g) return false;
+    g.drawImage(el, 0, 0, n, n);
+    const d = g.getImageData(0, 0, n, n).data;
+    return [0, n - 1, n * (n - 1), n * n - 1].every((i) => d[i * 4 + 3] < 10);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Product stage with restrained mouse parallax (rotateX/Y, small translate), a media switcher and
  * double-click / double-tap zoom on photos. While zoomed the mouse pans by moving and a finger by dragging.
  */
 export function ProductStage({ media, thumbsLabel, zoomLabels }: { media: Media[]; thumbsLabel: string; zoomLabels: ZoomLabels }) {
   const [active, setActive] = useState(0);
   const [zoomed, setZoomed] = useState(false);
+  const [cutouts, setCutouts] = useState<Record<string, boolean>>({});
+  const stage = useRef<HTMLDivElement>(null);
   const float = useRef<HTMLDivElement>(null);
   const img = useRef<HTMLImageElement>(null);
   const down = useRef({ type: "mouse", id: -1, x: 0, y: 0, lastX: 0, lastY: 0 });
@@ -25,6 +46,15 @@ export function ProductStage({ media, thumbsLabel, zoomLabels }: { media: Media[
   const origin = useRef({ x: 50, y: 50 });
   const current = media[active];
   const isImage = current?.type === "image";
+
+  const check = useCallback((el: HTMLImageElement) => {
+    const url = el.dataset.url;
+    if (url && el.naturalWidth) setCutouts((c) => (url in c ? c : { ...c, [url]: isCutout(el) }));
+  }, []);
+  // Photos that finished loading before the page came alive never fire onLoad, so look at them here.
+  useEffect(() => {
+    stage.current?.querySelectorAll<HTMLImageElement>("img[data-url]").forEach((el) => el.complete && check(el));
+  }, [check, active]);
 
   useEffect(() => {
     if (!zoomed) return;
@@ -119,6 +149,7 @@ export function ProductStage({ media, thumbsLabel, zoomLabels }: { media: Media[
 
   return (
     <div
+      ref={stage}
       className={`product-card__stage${isImage ? " has-zoom" : ""}${zoomed ? " is-zoomed" : ""}`}
       onPointerMove={move}
       onPointerLeave={leave}
@@ -129,9 +160,18 @@ export function ProductStage({ media, thumbsLabel, zoomLabels }: { media: Media[
       {current?.type === "video" ? (
         <video key={current.url} className="product-card__video" src={current.url} muted playsInline autoPlay loop aria-label={current.alt} />
       ) : current ? (
-        <div className="product-float" ref={float}>
+        <div className={`product-float${cutouts[current.url] ? " is-cutout" : ""}`} ref={float}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img ref={img} src={current.url} alt={current.alt} loading="lazy" decoding="async" draggable={false} />
+          <img
+            ref={img}
+            src={current.url}
+            alt={current.alt}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            data-url={current.url}
+            onLoad={(e) => check(e.currentTarget)}
+          />
           <div className="product-float__shadow" />
         </div>
       ) : null}
@@ -149,12 +189,19 @@ export function ProductStage({ media, thumbsLabel, zoomLabels }: { media: Media[
       {media.length > 1 && (
         <div className="product-card__thumbs" role="group" aria-label={thumbsLabel}>
           {media.map((m, i) => (
-            <button key={m.url + i} type="button" aria-pressed={i === active} aria-label={m.alt} onClick={() => pick(i)}>
+            <button
+              key={m.url + i}
+              type="button"
+              className={cutouts[m.url] ? "is-cutout" : undefined}
+              aria-pressed={i === active}
+              aria-label={m.alt}
+              onClick={() => pick(i)}
+            >
               {m.type === "video" ? (
                 <video src={m.url} muted playsInline preload="metadata" />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={m.url} alt="" loading="lazy" />
+                <img src={m.url} alt="" loading="lazy" data-url={m.url} onLoad={(e) => check(e.currentTarget)} />
               )}
             </button>
           ))}

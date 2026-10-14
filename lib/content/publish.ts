@@ -86,9 +86,17 @@ export function localeStatus(draft: unknown, published: unknown) {
   return res;
 }
 
+/** JSON with object keys sorted: Postgres (jsonb) hands keys back in its own order, which is not an edit. */
+const canonical = (v: unknown) =>
+  JSON.stringify(v, (_k, x: unknown) =>
+    x && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : x,
+  );
+
 export function hasUnpublishedChanges(c: PublishableCollection, row: Publishable & Record<string, unknown>) {
   if (!row.published_snapshot) return true;
-  return JSON.stringify(draftOf(c, row)) !== JSON.stringify(row.published_snapshot);
+  return canonical(draftOf(c, row)) !== canonical(row.published_snapshot);
 }
 
 /** What the public site sees: the published snapshot (or the draft in preview mode). */
