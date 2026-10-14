@@ -16,10 +16,21 @@ export function serviceClient() {
   if (!client) {
     client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: uncachedFetch },
     });
   }
   return client;
 }
+
+/**
+ * Next.js keeps fetch() answers in its Data Cache, which outlives deploys, so rows changed straight in
+ * the database could stay hidden even after a new deploy. Pages are already cached as a whole (see
+ * app/(site)/[locale]/layout.tsx), so database reads skip that second cache and always see current rows.
+ */
+const uncachedFetch: typeof fetch = (input, init) => {
+  const f = globalThis.fetch as typeof fetch & { _nextOriginalFetch?: typeof fetch };
+  return (f._nextOriginalFetch ?? f)(input, init);
+};
 
 const ORDER: Partial<Record<CollectionName, { column: string; ascending: boolean }>> = {
   distributor_requests: { column: "created_at", ascending: false },
