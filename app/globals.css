@@ -2236,7 +2236,6 @@ main {
 .brand-marquee {
   --marquee-gap: clamp(16px, 2.5vw, 28px);
   display: flex;
-  gap: var(--marquee-gap);
   overflow: hidden;
   padding-block: 12px;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
@@ -2249,11 +2248,18 @@ main {
   min-width: 100%;
   margin: 0;
   padding: 0;
+  /* the space before the next copy is part of the track, so one loop is exactly its width */
+  padding-inline-end: var(--marquee-gap);
   list-style: none;
   animation: brand-marquee var(--marquee-duration, 30s) linear infinite;
 }
-.brand-marquee:hover .brand-marquee__track,
-.brand-marquee:focus-within .brand-marquee__track {
+/* pause under a mouse or for keyboard focus; on touch screens a tap leaves hover/focus behind, which froze the loop */
+@media (hover: hover) and (pointer: fine) {
+  .brand-marquee:hover .brand-marquee__track {
+    animation-play-state: paused;
+  }
+}
+.brand-marquee:has(:focus-visible) .brand-marquee__track {
   animation-play-state: paused;
 }
 [dir="rtl"] .brand-marquee__track {
@@ -2261,12 +2267,12 @@ main {
 }
 @keyframes brand-marquee {
   to {
-    transform: translateX(calc(-100% - var(--marquee-gap)));
+    transform: translateX(-100%);
   }
 }
 @keyframes brand-marquee-rtl {
   to {
-    transform: translateX(calc(100% + var(--marquee-gap)));
+    transform: translateX(100%);
   }
 }
 .brand-logo {
@@ -2300,21 +2306,12 @@ main {
   color: var(--c-navy); /* same blue as the GOODMAX logo */
   transform: scale(1.06);
 }
+/* The owner wants the logos moving on every phone, including phones set to reduce motion
+   (Reduce Motion, Remove animations, some battery savers): those get the same loop at a gentler pace. */
 @media (prefers-reduced-motion: reduce) {
-  .brand-marquee {
-    flex-wrap: wrap;
-    justify-content: center;
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
   .brand-marquee__track {
-    animation: none;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .brand-marquee__track[aria-hidden],
-  .brand-marquee li.dup {
-    display: none;
+    animation-duration: var(--marquee-duration-calm, 45s) !important;
+    animation-iteration-count: infinite !important;
   }
 }
 

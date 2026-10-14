@@ -48,16 +48,20 @@ function Head({ x, h1, className = "display-lg" }: { x: Ctx; h1?: boolean; class
   );
 }
 
-/** Endless logo strip; each logo opens that brand's product gallery. Pauses on hover/focus. */
+/** Endless logo strip; each logo opens that brand's product gallery. Pauses under a mouse or keyboard focus. */
 function BrandMarquee({ brands, label }: { brands: { id: string; href: string; name: string; logo: string; accent: string }[]; label: string }) {
   // repeat short lists so one copy is wider than the screen, then render it twice for a seamless loop
   const copy = Array.from({ length: Math.max(1, Math.ceil(10 / brands.length)) }, () => brands).flat();
+  const seconds = Math.max(20, copy.length * 4);
   return (
-    <div className="brand-marquee" style={{ ["--marquee-duration" as string]: `${Math.max(20, copy.length * 4)}s` }}>
+    <div
+      className="brand-marquee"
+      style={{ ["--marquee-duration" as string]: `${seconds}s`, ["--marquee-duration-calm" as string]: `${Math.round(seconds * 1.5)}s` }}
+    >
       {[0, 1].map((half) => (
         <ul className="brand-marquee__track" key={half} aria-hidden={half === 1 || undefined}>
           {copy.map((b, i) => (
-            <li key={`${b.id}-${i}`} className={i >= brands.length ? "dup" : undefined}>
+            <li key={`${b.id}-${i}`}>
               <Link
                 href={b.href}
                 className="brand-logo"
