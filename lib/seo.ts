@@ -5,7 +5,14 @@ import { loc } from "@/lib/i18n";
 import { getLocale } from "@/lib/i18n/server";
 import { LOCALES } from "@/types/content";
 
-export const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")).replace(/\/$/, "");
+/**
+ * Address used in canonical links, the sitemap and social previews. In production Vercel's fallback is the
+ * project's own domain, never the per-deploy address, which sits behind the Vercel login.
+ */
+export const siteUrl = () => {
+  const vercelHost = process.env.VERCEL_ENV === "production" ? process.env.VERCEL_PROJECT_PRODUCTION_URL : process.env.VERCEL_URL;
+  return (process.env.NEXT_PUBLIC_SITE_URL || (vercelHost ? `https://${vercelHost}` : "http://localhost:3000")).replace(/\/$/, "");
+};
 
 export async function buildMetadata(route: string, bucket: string): Promise<Metadata> {
   const [locale, entries, general] = await Promise.all([getLocale(bucket), db().list("seo_entries"), db().getSetting("general")]);
