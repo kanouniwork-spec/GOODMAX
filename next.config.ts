@@ -17,6 +17,11 @@ const config: NextConfig = {
         source: "/media/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
+      {
+        // files in public/downloads (the brand identity pack) save to disk instead of opening in the browser
+        source: "/downloads/:path*",
+        headers: [{ key: "Content-Disposition", value: "attachment" }],
+      },
     ];
   },
 };

@@ -5,6 +5,9 @@ import { getSetting, getSocials } from "@/lib/content/queries";
 import { NAV } from "@/lib/nav";
 import { PLATFORM_NAMES, SocialIcon } from "./SocialIcon";
 
+/** Brand identity pack (logos, brand guide, product images). Served as a download by next.config.ts. */
+const IDENTITY_ZIP = "/downloads/goodmax-identity.zip";
+
 export async function Footer({ bucket }: { bucket: string }) {
   const { locale, t } = await getI18n(bucket);
   const [footer, general, appearance, socials] = await Promise.all([
@@ -57,6 +60,17 @@ export async function Footer({ bucket }: { bucket: string }) {
                 </Link>
               </li>
             </ul>
+            <div className="site-footer__section">
+              <h2>{t("footer.identity")}</h2>
+              <ul>
+                <li>
+                  <a href={IDENTITY_ZIP} download="GOODMAX-Identity.zip">
+                    {t("footer.identity_download")} <span className="arrow" aria-hidden="true">↓</span>
+                  </a>
+                </li>
+                <li className="muted site-footer__note">{t("footer.identity_size")}</li>
+              </ul>
+            </div>
           </div>
           <div>
             {socials.length > 0 && (

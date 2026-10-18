@@ -708,6 +708,12 @@ main {
 .site-footer .muted {
   color: var(--c-on-dark-muted);
 }
+.site-footer__section {
+  margin-top: 40px; /* a second heading in the same column (Brand identity under Contact) */
+}
+.site-footer__note {
+  font-size: 13px;
+}
 @media (max-width: 900px) {
   .site-footer__grid {
     grid-template-columns: 1fr 1fr;
