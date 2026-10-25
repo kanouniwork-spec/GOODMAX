@@ -1,95 +1,95 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { listAccounts, listFolders, listMessages } from "@/lib/zoho/mail";
-import { MailError, MailFrame, MailNotice, mailDate, people } from "@/components/admin/MailFrame";
+import { listMessages } from "@/lib/zoho/mail";
+import { folderHref, listDate, MailError, MailFrame, one, people, type Mailbox, type SP } from "@/components/admin/MailFrame";
+import { Avatar, MailIcon } from "@/components/admin/MailIcons";
 
-type SP = Record<string, string | string[] | undefined>;
 const PAGE = 25;
-const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
 
 export default async function MailInbox({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser("mail.manage");
   const sp = await searchParams;
   return (
-    <MailFrame active="inbox" notice={<MailNotice sp={sp} />}>
-      <Inbox sp={sp} />
+    <MailFrame sp={sp} active={one(sp.folder) || undefined}>
+      {(box) => <Inbox box={box} sp={sp} />}
     </MailFrame>
   );
 }
 
-async function Inbox({ sp }: { sp: SP }) {
+async function Inbox({ box, sp }: { box: Mailbox; sp: SP }) {
+  const folder = box.folders.find((f) => f.folderId === one(sp.folder)) ?? box.folders.find((f) => /inbox/i.test(f.type)) ?? box.folders[0];
+  if (!folder) return <div className="a-alert">This mailbox has no folders yet.</div>;
+  const page = Math.max(1, Math.min(400, Number(one(sp.page)) || 1));
+  let list;
   try {
-    const accounts = await listAccounts();
-    const account = accounts.find((a) => a.accountId === one(sp.account)) ?? accounts[0];
-    if (!account) return <div className="a-alert">Zoho returned no mailbox for this sign-in.</div>;
-    const folders = await listFolders(account.accountId);
-    const folder = folders.find((f) => f.folderId === one(sp.folder)) ?? folders.find((f) => f.type.toLowerCase() === "inbox") ?? folders[0];
-    if (!folder) return <div className="a-alert">This mailbox has no folders yet.</div>;
-    const page = Math.max(1, Math.min(400, Number(one(sp.page)) || 1));
-    const list = await listMessages(account.accountId, folder.folderId, (page - 1) * PAGE + 1, PAGE + 1);
-    const sent = /sent|outbox|draft/i.test(folder.type);
-    const link = (q: Record<string, string | number>) =>
-      `/admin/mail?${new URLSearchParams({ ...(accounts.length > 1 ? { account: account.accountId } : {}), folder: folder.folderId, ...Object.fromEntries(Object.entries(q).map(([k, v]) => [k, String(v)])) })}`;
-    return (
-      <>
-        {accounts.length > 1 && (
-          <nav className="mail-folders" aria-label="Mailboxes">
-            {accounts.map((a) => (
-              <Link key={a.accountId} href={`/admin/mail?account=${a.accountId}`} aria-current={a.accountId === account.accountId ? "page" : undefined}>
-                {a.email}
-              </Link>
-            ))}
-          </nav>
-        )}
-        <nav className="mail-folders" aria-label="Folders">
-          {folders.map((f) => (
-            <Link key={f.folderId} href={link({ folder: f.folderId })} aria-current={f.folderId === folder.folderId ? "page" : undefined}>
-              {f.name}
-            </Link>
-          ))}
-        </nav>
-        <div className="mail-list">
-          {list.length === 0 && <p className="muted">No mail in {folder.name}.</p>}
-          {list.slice(0, PAGE).map((m) => (
-            <Link
-              key={m.messageId}
-              className={`mail-row${m.unread ? " mail-row--unread" : ""}`}
-              href={`/admin/mail/read?${new URLSearchParams({ account: account.accountId, folder: m.folderId, id: m.messageId })}`}
-            >
-              <span className="mail-row__who" dir="auto">
-                {sent ? `To: ${people(m.to)}` : m.sender || m.from}
-              </span>
-              <span className="mail-row__text">
-                <b dir="auto">{m.subject || "(no subject)"}</b>
-                <span className="muted" dir="auto">
-                  {m.summary}
-                </span>
-              </span>
-              <span className="mail-row__when mono">
-                {m.attachment && <span aria-label="Has attachments">📎 </span>}
-                {mailDate(m.time)}
-              </span>
-            </Link>
-          ))}
-        </div>
-        {(page > 1 || list.length > PAGE) && (
-          <div className="a-actions" style={{ marginTop: 14 }}>
-            {page > 1 && (
-              <Link className="a-btn a-btn--sm" href={link({ page: page - 1 })}>
-                ← Newer
-              </Link>
-            )}
-            <span className="muted">Page {page}</span>
-            {list.length > PAGE && (
-              <Link className="a-btn a-btn--sm" href={link({ page: page + 1 })}>
-                Older →
-              </Link>
-            )}
-          </div>
-        )}
-      </>
-    );
+    list = await listMessages(box.account.accountId, folder.folderId, (page - 1) * PAGE + 1, PAGE + 1);
   } catch (e) {
     return <MailError error={e} />;
   }
+  const sent = /sent|outbox|draft/i.test(folder.type);
+  const first = (page - 1) * PAGE + 1;
+  const shown = list.slice(0, PAGE);
+  return (
+    <section className="mx-card">
+      <div className="mx-toolbar">
+        <h2>{folder.name}</h2>
+        <Link className="mx-iconbtn" href={folderHref(box, folder.folderId, page > 1 ? { page } : {})} title="Refresh" aria-label="Refresh">
+          <MailIcon name="refresh" />
+        </Link>
+        <span className="mx-toolbar__count">{shown.length ? `${first}–${first + shown.length - 1}` : "0"}</span>
+        {page > 1 ? (
+          <Link className="mx-iconbtn" href={folderHref(box, folder.folderId, { page: page - 1 })} title="Newer" aria-label="Newer">
+            <MailIcon name="left" />
+          </Link>
+        ) : (
+          <span className="mx-iconbtn" aria-disabled="true">
+            <MailIcon name="left" />
+          </span>
+        )}
+        {list.length > PAGE ? (
+          <Link className="mx-iconbtn" href={folderHref(box, folder.folderId, { page: page + 1 })} title="Older" aria-label="Older">
+            <MailIcon name="right" />
+          </Link>
+        ) : (
+          <span className="mx-iconbtn" aria-disabled="true">
+            <MailIcon name="right" />
+          </span>
+        )}
+      </div>
+      {shown.length === 0 ? (
+        <div className="mx-empty">
+          <MailIcon name="inbox" size={40} />
+          <p>No mail in {folder.name}.</p>
+        </div>
+      ) : (
+        <ul className="mx-list">
+          {shown.map((m) => {
+            const who = sent ? people(m.to) || m.to : m.sender || m.from;
+            return (
+              <li key={m.messageId}>
+                <Link
+                  className={`mx-row${m.unread ? " is-unread" : ""}`}
+                  href={`/admin/mail/read?${new URLSearchParams({ account: box.account.accountId, folder: m.folderId, id: m.messageId })}`}
+                >
+                  <Avatar name={who} />
+                  <span className="mx-row__who" dir="auto">
+                    {sent && <small>To: </small>}
+                    {who}
+                  </span>
+                  <span className="mx-row__text">
+                    <b dir="auto">{m.subject || "(no subject)"}</b>
+                    <span dir="auto">{m.summary}</span>
+                  </span>
+                  <span className="mx-row__meta">
+                    {m.attachment && <MailIcon name="clip" size={15} />}
+                    <time>{listDate(m.time)}</time>
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
 }

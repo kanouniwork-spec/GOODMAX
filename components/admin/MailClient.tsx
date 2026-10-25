@@ -1,247 +1,71 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { addMailAlias, createMailbox, disconnectMail, mailUploadSlot, replyMail, sendMail } from "@/app/admin/mail-actions";
-import type { AttachmentRef, MailUser } from "@/lib/zoho/mail";
+import { addMailAlias, createMailbox, disconnectMail } from "@/app/admin/mail-actions";
+import type { MailUser } from "@/lib/zoho/mail";
+import { MailIcon } from "./MailIcons";
 import { Confirm, useAct } from "./ui";
 
 export function DisconnectMail() {
   const { run, pending } = useAct();
   return (
     <Confirm
-      className="a-btn a-btn--sm"
+      className="mx-pill mx-pill--dark"
       disabled={pending}
       message="Disconnect Zoho Mail? The mail stays in Zoho; Admin stops showing it until someone connects again."
       onConfirm={() => run(disconnectMail, "Zoho Mail disconnected")}
     >
+      <MailIcon name="power" size={15} />
       Disconnect
     </Confirm>
   );
 }
 
-type Draft = { from: string; to: string; cc: string; bcc: string; subject: string; body: string };
+const SAFE_LINK = /^(https?|mailto|tel):$/;
 
-/* ---------------- attachments ---------------- */
-
-const MB = 1024 * 1024;
-const MAX_FILE = 20 * MB;
-const MAX_FILES = 10;
-const DIRECT_MAX = 4 * MB; // Vercel refuses request bodies over 4.5 MB; bigger files go through the upload bucket
-const SHRINK_OVER = 3 * MB;
-type Att = { key: string; name: string; size: number; preview?: string; ref?: AttachmentRef; error?: string };
-
-const sizeText = (n: number) => (n >= MB ? `${(n / MB).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
-
-/** Phone photos are often 5–10 MB: above 3 MB they are re-encoded as JPEG, at most 2560 px wide or high. */
-async function shrinkPhoto(file: File): Promise<File> {
-  if (!/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type) || file.size <= SHRINK_OVER) return file;
-  try {
-    const img = await createImageBitmap(file);
-    const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(img.width * scale);
-    canvas.height = Math.round(img.height * scale);
-    const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#fff"; // transparent PNG areas become white, not black
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
-    if (!blob || blob.size >= file.size) return file;
-    return new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "photo"}.jpg`, { type: "image/jpeg" });
-  } catch {
-    return file; // a format this browser cannot open (HEIC outside Safari): sent as it is
-  }
-}
-
-async function answer(res: Response): Promise<AttachmentRef> {
-  const json = (await res.json().catch(() => ({}))) as AttachmentRef & { error?: string };
-  if (!res.ok || !json.storeName) throw new Error(json.error || `Upload failed (${res.status})`);
-  return { storeName: json.storeName, attachmentPath: json.attachmentPath, attachmentName: json.attachmentName };
-}
-
-/** Puts one file in Zoho's file store of the sending mailbox (app/api/admin/zoho/attachment). */
-async function uploadToZoho(file: File, from: string): Promise<AttachmentRef> {
-  if (file.size > DIRECT_MAX) {
-    const slot = await mailUploadSlot(file.name);
-    if (!slot.ok) throw new Error(slot.error);
-    if (slot.data) {
-      const { createClient } = await import("@supabase/supabase-js"); // only when a file is too big for a direct upload
-      const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
-      const up = await sb.storage.from(slot.data.bucket).uploadToSignedUrl(slot.data.path, slot.data.token, file, { contentType: file.type || "application/octet-stream" });
-      if (up.error) throw new Error(up.error.message);
-      return answer(await fetch("/api/admin/zoho/attachment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from, path: slot.data.path, name: file.name }) }));
-    }
-  }
-  const form = new FormData();
-  form.append("from", from);
-  form.append("file", file);
-  return answer(await fetch("/api/admin/zoho/attachment", { method: "POST", body: form }));
-}
-
-function useAttachments(from: string) {
-  const [atts, setAtts] = useState<Att[]>([]);
-  const live = useRef(atts);
-  live.current = atts;
-  useEffect(() => () => live.current.forEach((a) => a.preview && URL.revokeObjectURL(a.preview)), []);
-  const patch = (key: string, p: Partial<Att>) => setAtts((list) => list.map((a) => (a.key === key ? { ...a, ...p } : a)));
-  const add = (files: FileList | File[]) => {
-    const room = MAX_FILES - live.current.length;
-    [...files].slice(0, Math.max(0, room)).forEach(async (original) => {
-      const key = `${Date.now()}-${Math.random()}`;
-      const preview = original.type.startsWith("image/") ? URL.createObjectURL(original) : undefined;
-      setAtts((list) => [...list, { key, name: original.name, size: original.size, preview }]);
-      try {
-        const file = await shrinkPhoto(original);
-        if (file.size > MAX_FILE) throw new Error("Larger than 20 MB");
-        patch(key, { name: file.name, size: file.size });
-        patch(key, { ref: await uploadToZoho(file, from) });
-      } catch (e) {
-        patch(key, { error: e instanceof Error ? e.message : String(e) });
+/**
+ * A received mail's HTML in a sandboxed frame that grows to the mail's height. Scripts, forms and plugins stay off
+ * (no allow-scripts, and the frame's own CSP); same-origin only lets this page measure it and drop links that are not
+ * web, mail or phone links. Links open in a new tab.
+ */
+export function MailBody({ srcDoc }: { srcDoc: string }) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    const frame = ref.current;
+    if (!frame) return;
+    let watch: ResizeObserver | undefined;
+    const fit = () => {
+      const body = frame.contentDocument?.body;
+      if (body) frame.style.height = `${Math.max(120, body.scrollHeight, body.offsetHeight) + 8}px`;
+    };
+    const ready = () => {
+      const doc = frame.contentDocument;
+      if (!doc?.body) return;
+      doc.querySelectorAll<HTMLAnchorElement | HTMLAreaElement>("a[href], area[href]").forEach((a) => SAFE_LINK.test(a.protocol) || a.removeAttribute("href"));
+      fit();
+      watch?.disconnect();
+      if (typeof ResizeObserver !== "undefined") {
+        watch = new ResizeObserver(fit);
+        watch.observe(doc.body);
       }
-    });
-  };
-  const remove = (key: string) =>
-    setAtts((list) =>
-      list.filter((a) => {
-        if (a.key === key && a.preview) URL.revokeObjectURL(a.preview);
-        return a.key !== key;
-      }),
-    );
-  const clear = () => {
-    live.current.forEach((a) => a.preview && URL.revokeObjectURL(a.preview));
-    setAtts([]);
-  };
-  return { atts, add, remove, clear, uploading: atts.some((a) => !a.ref && !a.error), full: atts.length >= MAX_FILES };
-}
-
-function AttachmentPicker({ files, id }: { files: ReturnType<typeof useAttachments>; id: string }) {
-  const anyFile = useRef<HTMLInputElement>(null);
-  const photo = useRef<HTMLInputElement>(null);
-  const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.length) files.add(e.target.files);
-    e.target.value = "";
-  };
-  return (
-    <div className="mail-attach">
-      <div className="a-actions">
-        <button type="button" className="a-btn a-btn--sm" disabled={files.full} onClick={() => anyFile.current?.click()}>
-          + Attach files
-        </button>
-        <button type="button" className="a-btn a-btn--sm" disabled={files.full} onClick={() => photo.current?.click()}>
-          + Add photos
-        </button>
-        <small className="muted">Up to 10 files, 20 MB each. You can also drop files here.</small>
-        <input ref={anyFile} id={`${id}-files`} type="file" multiple hidden onChange={pick} />
-        <input ref={photo} id={`${id}-photos`} type="file" accept="image/*" multiple hidden onChange={pick} />
-      </div>
-      {files.atts.length > 0 && (
-        <ul className="mail-files">
-          {files.atts.map((a) => (
-            <li key={a.key} className={a.error ? "is-error" : undefined}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {a.preview ? <img src={a.preview} alt="" /> : <span className="mail-files__icon">{a.name.split(".").pop()?.slice(0, 4).toUpperCase() || "FILE"}</span>}
-              <span className="mail-files__name" dir="auto">
-                {a.name}
-                <small>{a.error ? a.error : a.ref ? sizeText(a.size) : `${sizeText(a.size)} · uploading…`}</small>
-              </span>
-              <button type="button" className="a-btn a-btn--sm a-btn--ghost" aria-label={`Remove ${a.name}`} onClick={() => files.remove(a.key)}>
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-/** New mail (Write tab) or a reply under an open message. Plain text, sent as simple HTML, with files and photos. */
-export function MailCompose({ fromOptions, initial, replyTo }: { fromOptions: string[]; initial: Partial<Draft>; replyTo?: string }) {
-  const { run, pending } = useAct();
-  const blank: Draft = { from: fromOptions[0] ?? "", to: "", cc: "", bcc: "", subject: "", body: "" };
-  const [d, setD] = useState<Draft>({ ...blank, ...initial });
-  const [copies, setCopies] = useState(!!(initial.cc || initial.bcc));
-  const [dragging, setDragging] = useState(false);
-  const files = useAttachments(d.from);
-  const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setD({ ...d, [k]: e.target.value });
-  const id = replyTo ? "r" : "w";
-  const ready = files.atts.filter((a) => a.ref).map((a) => a.ref!);
-  const failed = files.atts.some((a) => a.error);
-  return (
-    <form
-      className={`a-card mail-compose${dragging ? " is-dragging" : ""}`}
-      onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes("Files")) return;
-        e.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={(e) => e.currentTarget.contains(e.relatedTarget as Node) || setDragging(false)}
-      onDrop={(e) => {
-        if (!e.dataTransfer.files.length) return;
-        e.preventDefault();
-        setDragging(false);
-        files.add(e.dataTransfer.files);
-      }}
-      onSubmit={(e) => {
-        e.preventDefault();
-        const draft = { ...d, attachments: ready };
-        run(() => (replyTo ? replyMail(replyTo, draft) : sendMail(draft)), replyTo ? "Reply sent" : "Mail sent", () => {
-          setD(replyTo ? { ...d, body: "" } : { ...blank, from: d.from });
-          files.clear();
-        });
-      }}
-    >
-      <h2>{replyTo ? "Reply" : "New mail"}</h2>
-      <div className="a-row">
-        <div className="a-field">
-          <label htmlFor={`${id}-from`}>From</label>
-          <select id={`${id}-from`} value={d.from} onChange={set("from")} disabled={files.atts.length > 0} title={files.atts.length ? "Remove the files to change the sender" : undefined}>
-            {fromOptions.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="a-field">
-          <label htmlFor={`${id}-to`}>To</label>
-          <input id={`${id}-to`} type="text" inputMode="email" required value={d.to} onChange={set("to")} placeholder="name@example.com, …" />
-        </div>
-      </div>
-      {copies ? (
-        <div className="a-row">
-          <div className="a-field">
-            <label htmlFor={`${id}-cc`}>Cc</label>
-            <input id={`${id}-cc`} type="text" inputMode="email" value={d.cc} onChange={set("cc")} />
-          </div>
-          <div className="a-field">
-            <label htmlFor={`${id}-bcc`}>Bcc</label>
-            <input id={`${id}-bcc`} type="text" inputMode="email" value={d.bcc} onChange={set("bcc")} />
-          </div>
-        </div>
-      ) : (
-        <button type="button" className="a-btn a-btn--sm a-btn--ghost" style={{ marginBottom: 12 }} onClick={() => setCopies(true)}>
-          + Cc / Bcc
-        </button>
-      )}
-      <div className="a-field">
-        <label htmlFor={`${id}-subject`}>Subject</label>
-        <input id={`${id}-subject`} type="text" dir="auto" maxLength={300} value={d.subject} onChange={set("subject")} />
-      </div>
-      <div className="a-field">
-        <label htmlFor={`${id}-body`}>Message</label>
-        <textarea id={`${id}-body`} dir="auto" rows={replyTo ? 7 : 12} required={!ready.length} value={d.body} onChange={set("body")} />
-      </div>
-      <AttachmentPicker files={files} id={id} />
-      {replyTo && files.atts.length > 0 && <p className="muted">With files, the reply goes out as a new mail with the same subject.</p>}
-      <div className="a-actions">
-        <button className="a-btn a-btn--primary" disabled={pending || files.uploading}>
-          {pending ? "Sending…" : files.uploading ? "Uploading files…" : replyTo ? "Send reply" : "Send"}
-        </button>
-        {failed && <span className="muted">Files marked in red will not be sent.</span>}
-      </div>
-    </form>
-  );
+    };
+    frame.addEventListener("load", ready); // again once the mail's pictures have loaded
+    // and as soon as the text is there, without waiting for pictures (up to 5 s of checks)
+    let tries = 0;
+    let timer = 0;
+    const early = () => {
+      const doc = frame.contentDocument;
+      if (doc?.URL === "about:srcdoc" && doc.readyState !== "loading") ready();
+      else if (tries++ < 100) timer = window.setTimeout(early, 50);
+    };
+    early();
+    return () => {
+      window.clearTimeout(timer);
+      frame.removeEventListener("load", ready);
+      watch?.disconnect();
+    };
+  }, [srcDoc]);
+  return <iframe ref={ref} className="mx-read__body" title="Message" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcDoc={srcDoc} />;
 }
 
 /** Admin › Mail › Addresses: extra addresses for an existing mailbox, and new mailboxes. */

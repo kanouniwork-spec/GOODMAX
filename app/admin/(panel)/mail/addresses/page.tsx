@@ -1,29 +1,35 @@
 import { requireUser } from "@/lib/auth/session";
-import { getConnection, listUsers } from "@/lib/zoho/mail";
-import { MailError, MailFrame } from "@/components/admin/MailFrame";
+import { listUsers } from "@/lib/zoho/mail";
+import { MailError, MailFrame, type SP } from "@/components/admin/MailFrame";
 import { MailAddresses } from "@/components/admin/MailClient";
 
-export default async function MailAddressesPage() {
+export default async function MailAddressesPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireUser("mail.manage");
+  const sp = await searchParams;
   return (
-    <MailFrame active="addresses">
-      <Addresses />
+    <MailFrame sp={sp} active="addresses">
+      {(box) => <Addresses email={box.conn.email || box.account.email} />}
     </MailFrame>
   );
 }
 
-async function Addresses() {
+async function Addresses({ email }: { email: string }) {
   try {
-    const [users, conn] = await Promise.all([listUsers(), getConnection()]);
-    const domain = (conn?.email.split("@")[1] || "goodmaxdz.com").toLowerCase();
+    const users = await listUsers();
+    const domain = (email.split("@")[1] || "goodmaxdz.com").toLowerCase();
     return (
-      <>
-        <p className="muted" style={{ marginTop: 0 }}>
-          The Inbox tab shows the mail of {conn?.email || "the connected mailbox"}, including every address added to it. Other mailboxes are read by their owners at
-          mail.zoho.com.
-        </p>
-        <MailAddresses users={users} domain={domain} />
-      </>
+      <section className="mx-card">
+        <div className="mx-toolbar">
+          <h2>Addresses</h2>
+        </div>
+        <div className="mx-pad">
+          <p className="mx-lead">
+            The inbox here shows the mail of {email || "the connected mailbox"}, including every address added to it. Other mailboxes are read by their owners at
+            mail.zoho.com.
+          </p>
+          <MailAddresses users={users} domain={domain} />
+        </div>
+      </section>
     );
   } catch (e) {
     return <MailError error={e} />;
