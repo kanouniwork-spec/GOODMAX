@@ -408,6 +408,38 @@ function sections(): PageSection[] {
       show_map: true,
       show_socials: true,
     }),
+
+    /* ---------------- GROUP (opened from the maker's logo in the footer) ---------------- */
+    section("group", "group_intro", {
+      eyebrow: L("The group", "Le groupe", "المجموعة"),
+      title: L("Vistar-Bouti, the group behind our brands", "Vistar-Bouti, le groupe derrière nos marques", "Vistar-Bouti، المجموعة التي تصنع علاماتنا"),
+      body: L(
+        "Vistar-Bouti is the group that makes the brands on this site. It manufactures GOODMAX in Algeria under licence from the parent company, and develops and manufactures its own local brands.\n\nIts expertise in import and export goes back to 1995. In 2023 it opened its first factory dedicated to disposable razors, the first in Africa to make GOODMAX under licence, with blades made in Sweden.",
+        "Vistar-Bouti est le groupe qui fabrique les marques présentées sur ce site. Il fabrique GOODMAX en Algérie sous licence de la société mère, et développe et fabrique ses propres marques locales.\n\nSon expertise dans l’import-export remonte à 1995. En 2023, il a créé sa première usine spécialisée dans la fabrication de rasoirs jetables, la première en Afrique à fabriquer GOODMAX sous licence, avec des lames fabriquées en Suède.",
+        "Vistar-Bouti هي المجموعة التي تصنع العلامات المعروضة في هذا الموقع. تُصنّع GOODMAX في الجزائر بترخيص من الشركة الأم، كما تطوّر وتصنّع علاماتها المحلية الخاصة.\n\nتعود خبرتها في مجال الاستيراد والتصدير إلى سنة 1995، وفي سنة 2023 أنشأت أول مصنع لها متخصص في صناعة شفرات الحلاقة أحادية الاستعمال، وهو الأول في إفريقيا الذي يصنع GOODMAX بترخيص، بشفرات مصنوعة في السويد.",
+      ),
+      group_logo_url: "/media/vistar-bouti-white.png",
+      group_name: "Vistar-Bouti",
+      group_caption: L("Manufacturer in Algeria", "Fabricant en Algérie", "المُصنِّع في الجزائر"),
+      brand_logo_url: "/media/goodmax-logo-white.png",
+      brand_name: "GOODMAX",
+      brand_caption: L("Made under licence", "Fabriquée sous licence", "مصنوعة بترخيص"),
+      brand_url: "/products?brand=goodmax#products",
+      facts: [
+        { value: L("1995", "1995", "1995"), label: L("Import and export expertise begins", "Début de l’expertise en import-export", "بداية الخبرة في الاستيراد والتصدير") },
+        { value: L("2023", "2023", "2023"), label: L("First disposable-razor factory", "Première usine de rasoirs jetables", "أول مصنع لشفرات الحلاقة أحادية الاستعمال") },
+        { value: L("1st", "1re", "أول"), label: L("factory in Africa to make GOODMAX under licence", "usine en Afrique à fabriquer GOODMAX sous licence", "مصنع في إفريقيا يصنع GOODMAX بترخيص") },
+      ],
+      link_label: L("Read our story", "Lire notre histoire", "اقرأ قصتنا"),
+      link_url: "/about",
+    }),
+    section("group", "brand_rail", {
+      eyebrow: L("Our brands", "Nos marques", "علاماتنا"),
+      title: L("Brands made by the group", "Les marques du groupe", "علامات المجموعة"),
+      subtitle: L("Choose a brand to see its products.", "Choisissez une marque pour voir ses produits.", "اختر علامة لترى منتجاتها."),
+      layout: "logos",
+      limit: 0,
+    }),
   ];
 }
 
@@ -537,6 +569,7 @@ function pages(): Page[] {
     ["distributors", L("Distributors", "Distributeurs", "الموزعون")],
     ["locations", L("Locations", "Points de vente", "المواقع")],
     ["contact", L("Contact", "Contact", "اتصل بنا")],
+    ["group", L("Vistar-Bouti Group", "Groupe Vistar-Bouti", "مجموعة Vistar-Bouti")],
   ];
   return t.map(([slug, title_json], i) => ({ id: `page-${slug}`, slug, title_json, sort_order: i }));
 }
@@ -550,6 +583,7 @@ function seo(): SeoEntry[] {
     ["/distributors", L("Become a distributor — GOODMAX", "Devenir distributeur — GOODMAX", "كن موزعاً — GOODMAX"), L("Apply to distribute GOODMAX in your wilaya.", "Postulez pour distribuer GOODMAX dans votre wilaya.", "قدّم طلبك لتوزيع GOODMAX في ولايتك.")],
     ["/locations", L("Locations — GOODMAX", "Points de vente — GOODMAX", "المواقع — GOODMAX"), L("Find GOODMAX distributors and points of sale.", "Trouvez les distributeurs et points de vente GOODMAX.", "اعثر على موزعي ونقاط بيع GOODMAX.")],
     ["/contact", L("Contact — GOODMAX", "Contact — GOODMAX", "اتصل بنا — GOODMAX"), L("Contact the GOODMAX team.", "Contactez l'équipe GOODMAX.", "تواصل مع فريق GOODMAX.")],
+    ["/group", L("Vistar-Bouti Group — GOODMAX", "Groupe Vistar-Bouti — GOODMAX", "مجموعة Vistar-Bouti — GOODMAX"), L("Vistar-Bouti, the group that makes GOODMAX and our brands in Algeria.", "Vistar-Bouti, le groupe qui fabrique GOODMAX et nos marques en Algérie.", "Vistar-Bouti، المجموعة التي تصنع GOODMAX وعلاماتنا في الجزائر.")],
   ];
   return routes.map(([route, title_json, description_json]) => ({
     id: `seo-${route === "/" ? "home" : route.slice(1)}`,

@@ -7,6 +7,8 @@ import { PLATFORM_NAMES, SocialIcon } from "./SocialIcon";
 
 /** Brand identity pack (logos, brand guide, product images). Served as a download by next.config.ts. */
 const IDENTITY_ZIP = "/downloads/goodmax-identity.zip";
+/** The maker's logo opens its page (the "group" page in Admin › Pages). */
+const GROUP_PAGE = "/group";
 
 export async function Footer({ bucket }: { bucket: string }) {
   const { locale, t } = await getI18n(bucket);
@@ -113,11 +115,11 @@ export async function Footer({ bucket }: { bucket: string }) {
             </ul>
           )}
           {footer.maker_logo_url && (
-            <div className="site-footer__maker">
+            <Link href={GROUP_PAGE} className="site-footer__maker">
               {loc(footer.maker_label_json, locale) && <span>{loc(footer.maker_label_json, locale)}</span>}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={footer.maker_logo_url} alt={footer.maker_name} loading="lazy" />
-            </div>
+            </Link>
           )}
         </div>
       </div>

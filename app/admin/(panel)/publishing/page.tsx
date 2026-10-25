@@ -4,7 +4,7 @@ import { SECTION_DEFINITIONS } from "@/lib/sections/schema";
 import { publishInfo } from "@/lib/admin/info";
 import { PublishingCenter, type PubRow } from "@/components/admin/PublishingCenter";
 
-const ROUTE: Record<string, string> = { home: "/", about: "/about", brands: "/brands", products: "/products", distributors: "/distributors", locations: "/locations", contact: "/contact" };
+const ROUTE: Record<string, string> = { home: "/", about: "/about", brands: "/brands", products: "/products", distributors: "/distributors", locations: "/locations", contact: "/contact", group: "/group" };
 
 export default async function Publishing({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const sp = await searchParams;

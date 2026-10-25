@@ -95,7 +95,7 @@ export const SECTION_DEFINITIONS: Record<SectionType, SectionDefinition> = {
   brand_rail: {
     type: "brand_rail",
     name: "Brand Rail",
-    description: "Brand selector: an animated logo loop or cards. Each brand opens its product gallery.",
+    description: "Brand selector: an animated logo loop, cards or a logo grid. Each brand opens its product gallery.",
     fields: [
       eyebrow,
       title,
@@ -104,14 +104,43 @@ export const SECTION_DEFINITIONS: Record<SectionType, SectionDefinition> = {
         key: "layout",
         type: "select",
         label: "Style",
-        help: "Empty = logo loop on the home page, cards elsewhere.",
+        help: "Empty = logo loop on the home page, cards elsewhere. Logo grid = a tile per brand.",
         options: [
           { value: "", label: "Automatic" },
           { value: "marquee", label: "Animated logo loop" },
           { value: "cards", label: "Cards" },
+          { value: "logos", label: "Logo grid" },
         ],
       },
       { key: "limit", type: "number", label: "Max brands (0 = all)", min: 0, max: 24 },
+    ],
+  },
+  group_intro: {
+    type: "group_intro",
+    name: "Group Introduction",
+    description: "The maker's logo beside a brand logo, with the group's story and key figures.",
+    fields: [
+      eyebrow,
+      title,
+      body,
+      { key: "group_logo_url", type: "media", label: "Group logo (light, for a dark background)" },
+      { key: "group_name", type: "text", label: "Group name", help: "Read out in place of the logo by screen readers and search engines." },
+      { key: "group_caption", type: "ltext", label: "Caption under the group logo" },
+      { key: "brand_logo_url", type: "media", label: "Brand logo beside it (light)" },
+      { key: "brand_name", type: "text", label: "Brand name" },
+      { key: "brand_caption", type: "ltext", label: "Caption under the brand logo" },
+      { key: "brand_url", type: "url", label: "Brand logo link", help: "e.g. /products?brand=goodmax#products. Empty = not a link." },
+      {
+        key: "facts",
+        type: "items",
+        label: "Key figures",
+        itemLabel: "Figure",
+        fields: [
+          { key: "value", type: "ltext", label: "Figure (e.g. 1995)" },
+          { key: "label", type: "ltext", label: "What it means" },
+        ],
+      },
+      ...link("link", "Link"),
     ],
   },
   product_grid: {

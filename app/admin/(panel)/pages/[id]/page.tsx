@@ -4,7 +4,7 @@ import { SectionEditor } from "@/components/admin/SectionEditor";
 import { SECTION_DEFINITIONS } from "@/lib/sections/schema";
 import { publishInfo } from "@/lib/admin/info";
 
-const ROUTE: Record<string, string> = { home: "/", about: "/about", brands: "/brands", products: "/products", distributors: "/distributors", locations: "/locations", contact: "/contact" };
+const ROUTE: Record<string, string> = { home: "/", about: "/about", brands: "/brands", products: "/products", distributors: "/distributors", locations: "/locations", contact: "/contact", group: "/group" };
 
 export default async function EditSection({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -34,7 +34,7 @@ export interface Page {
   sort_order: number;
 }
 
-export const PAGE_SLUGS = ["home", "about", "brands", "products", "distributors", "locations", "contact"] as const;
+export const PAGE_SLUGS = ["home", "about", "brands", "products", "distributors", "locations", "contact", "group"] as const;
 export type PageSlug = (typeof PAGE_SLUGS)[number];
 
 export interface PageSection extends Publishable {
@@ -63,6 +63,7 @@ export const SECTION_TYPES = [
   "gallery",
   "video",
   "footer_cta",
+  "group_intro",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 

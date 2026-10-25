@@ -19,7 +19,7 @@ type Section = {
   status: Record<Locale, { missing: number; total: number; changed: boolean; published: boolean }>;
 };
 
-const ROUTE: Record<string, string> = { home: "/", about: "/about", brands: "/brands", products: "/products", distributors: "/distributors", locations: "/locations", contact: "/contact" };
+const ROUTE: Record<string, string> = { home: "/", about: "/about", brands: "/brands", products: "/products", distributors: "/distributors", locations: "/locations", contact: "/contact", group: "/group" };
 
 export function PageBuilder({
   page,

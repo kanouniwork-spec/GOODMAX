@@ -683,6 +683,12 @@ main {
   height: 40px;
   max-width: 100%;
   opacity: 0.92;
+  transition: opacity var(--d-fast), transform var(--d-base) var(--ease);
+}
+.site-footer__maker:hover img,
+.site-footer__maker:focus-visible img {
+  opacity: 1;
+  transform: translateY(-2px);
 }
 @media (max-width: 560px) {
   .site-footer__maker img {
@@ -1333,6 +1339,233 @@ main {
   }
   .brand-card__cta {
     margin-top: 16px;
+  }
+}
+
+/* brand logo grid (the group page): one tile per brand, each opening its products */
+.brand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.brand-tile {
+  --accent: var(--c-navy);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  height: 100%;
+  min-height: 210px;
+  padding: 22px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-card);
+  background: #fff;
+  color: #8a94a6;
+  transition:
+    color var(--d-slow) var(--ease),
+    border-color var(--d-slow) var(--ease),
+    transform var(--d-slow) var(--ease),
+    box-shadow var(--d-slow) var(--ease);
+}
+.brand-tile:hover,
+.brand-tile:focus-visible {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--c-border));
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+.brand-tile__logo {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 8px 10px;
+}
+.brand-tile .brand-logo__mark {
+  height: 64px;
+}
+.brand-tile__foot {
+  display: grid;
+  gap: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-border);
+  font-size: 13px;
+  color: var(--c-muted);
+}
+.brand-tile__foot b {
+  color: var(--c-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+.brand-tile:hover .brand-tile__foot span,
+.brand-tile:focus-visible .brand-tile__foot span {
+  color: var(--accent);
+}
+@media (max-width: 560px) {
+  .brand-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .brand-tile {
+    min-height: 160px;
+    padding: 14px;
+    gap: 12px;
+  }
+  .brand-tile .brand-logo__mark {
+    height: 44px;
+  }
+  .brand-tile__foot {
+    padding-top: 10px;
+    font-size: 12px;
+  }
+  .brand-tile__foot b {
+    font-size: 14px;
+  }
+}
+
+/* group page (Vistar-Bouti): the maker's logo beside the GOODMAX logo, its story and key figures */
+.group__inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+/* the logos come first in the page (first thing seen on a phone) but sit beside the text on wide screens */
+.group__text {
+  grid-row: 1;
+  grid-column: 1;
+  display: grid;
+  gap: 22px;
+  justify-items: start;
+}
+.group__text .lead {
+  white-space: pre-line;
+}
+.group__text .btn {
+  margin-top: 6px;
+}
+.group__lockup {
+  grid-row: 1;
+  grid-column: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(20px, 3vw, 36px);
+  padding: clamp(32px, 6vw, 88px) clamp(22px, 3vw, 40px);
+  border: 1px solid var(--c-line-dark);
+  border-radius: 24px;
+  background: radial-gradient(90% 70% at 50% 0%, rgba(46, 116, 255, 0.16), transparent 70%) var(--c-ink); /* opaque, so the grid lines stay behind */
+}
+.group__logo {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+}
+/* both logos get the same box, so they line up and their captions start on one line */
+.group__logo img {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  height: clamp(34px, 4.2vw, 56px);
+  object-fit: contain;
+}
+.group__logo figcaption {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-on-dark-muted);
+}
+[dir="rtl"] .group__logo figcaption {
+  letter-spacing: 0;
+  font-family: var(--f-body);
+  font-size: 13px;
+}
+.group__join {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(160, 190, 235, 0.45), transparent);
+}
+.group__brand-link {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  border-radius: 8px;
+  transition: transform var(--d-slow) var(--ease), opacity var(--d-base);
+}
+.group__brand-link:hover,
+.group__brand-link:focus-visible {
+  transform: scale(1.04);
+}
+.group__brand-link:focus-visible {
+  outline: 2px solid #7fb0ff;
+  outline-offset: 8px;
+}
+.group__facts {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 24px clamp(24px, 4vw, 56px);
+  margin: 0;
+  padding-top: 28px;
+  border-top: 1px solid var(--c-line-dark);
+}
+.group__facts dt {
+  font-family: var(--f-display);
+  font-size: clamp(40px, 4.4vw, 64px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  background: linear-gradient(180deg, #fff, #7fb0ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+[dir="rtl"] .group__facts dt {
+  letter-spacing: 0;
+}
+.group__facts dd {
+  margin: 10px 0 0;
+  max-width: 26ch;
+  color: var(--c-on-dark-muted);
+  line-height: 1.4;
+}
+.group__inner:not(:has(.group__lockup)) {
+  grid-template-columns: 1fr;
+}
+@media (max-width: 900px) {
+  .group__inner {
+    grid-template-columns: 1fr;
+  }
+  .group__text,
+  .group__lockup {
+    grid-row: auto;
+    grid-column: auto;
+  }
+  /* the panel spans the full width here, so the logos can be larger */
+  .group__logo img {
+    height: clamp(34px, 7vw, 56px);
+  }
+}
+@media (max-width: 420px) {
+  .group__lockup {
+    gap: 16px;
+    padding: 28px 16px;
+  }
+  .group__logo {
+    gap: 12px;
+  }
+  .group__logo figcaption {
+    font-size: 10px;
+    letter-spacing: 0.1em;
   }
 }
 
