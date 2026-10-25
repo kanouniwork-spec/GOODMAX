@@ -8,6 +8,12 @@ export const BRAND_FIELDS: Field[] = [
   { key: "logo_url", type: "media", label: "Logo (optional, transparent PNG/SVG works best)" },
   { key: "background_url", type: "media", label: "Card background image (optional)" },
   { key: "accent_color", type: "color", label: "Accent colour (hover glow)" },
+  {
+    key: "licensed",
+    type: "boolean",
+    label: "Made under GOODMAX licence",
+    help: "On the group page, ticked brands are listed under the GOODMAX logo and the others under Vistar-Bouti. Applies as soon as you save.",
+  },
 ];
 
 export const productFields = (brands: { value: string; label: string }[]): Field[] => [

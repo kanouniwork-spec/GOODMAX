@@ -76,6 +76,8 @@ export interface Brand extends Publishable {
   logo_url: string;
   accent_color: string;
   background_url: string;
+  /** Made under GOODMAX licence (listed under the GOODMAX logo on the group page) rather than one of the maker's own brands. */
+  licensed: boolean;
   visible: boolean;
   sort_order: number;
 }

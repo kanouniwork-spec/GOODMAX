@@ -420,11 +420,12 @@ function sections(): PageSection[] {
       ),
       group_logo_url: "/media/vistar-bouti-white.png",
       group_name: "Vistar-Bouti",
-      group_caption: L("Manufacturer in Algeria", "Fabricant en Algérie", "المُصنِّع في الجزائر"),
+      group_caption: L("Vistar-Bouti’s own brands", "Marques propres de Vistar-Bouti", "علامات Vistar-Bouti الخاصة"),
       brand_logo_url: "/media/goodmax-logo-white.png",
       brand_name: "GOODMAX",
-      brand_caption: L("Made under licence", "Fabriquée sous licence", "مصنوعة بترخيص"),
+      brand_caption: L("Made under GOODMAX licence", "Fabriquées sous licence GOODMAX", "مصنوعة بترخيص من GOODMAX"),
       brand_url: "/products?brand=goodmax#products",
+      show_brands: true,
       facts: [
         { value: L("1995", "1995", "1995"), label: L("Import and export expertise begins", "Début de l’expertise en import-export", "بداية الخبرة في الاستيراد والتصدير") },
         { value: L("2023", "2023", "2023"), label: L("First disposable-razor factory", "Première usine de rasoirs jetables", "أول مصنع لشفرات الحلاقة أحادية الاستعمال") },
@@ -432,13 +433,6 @@ function sections(): PageSection[] {
       ],
       link_label: L("Read our story", "Lire notre histoire", "اقرأ قصتنا"),
       link_url: "/about",
-    }),
-    section("group", "brand_rail", {
-      eyebrow: L("Our brands", "Nos marques", "علاماتنا"),
-      title: L("Brands made by the group", "Les marques du groupe", "علامات المجموعة"),
-      subtitle: L("Choose a brand to see its products.", "Choisissez une marque pour voir ses produits.", "اختر علامة لترى منتجاتها."),
-      layout: "logos",
-      limit: 0,
     }),
   ];
 }
@@ -480,7 +474,7 @@ function milestones() {
 }
 
 function brands(): Brand[] {
-  const base = (i: number, slug: string, name: LocalizedText, accent: string, placeholder: boolean, bg: string): Brand => {
+  const base = (i: number, slug: string, name: LocalizedText, accent: string, placeholder: boolean, bg: string, licensed = false): Brand => {
     const content = {
       slug,
       name_json: name,
@@ -495,6 +489,7 @@ function brands(): Brand[] {
     return {
       id: `brand-${slug}`,
       ...content,
+      licensed,
       visible: true,
       sort_order: i,
       published_snapshot: JSON.parse(JSON.stringify(content)),
@@ -504,12 +499,13 @@ function brands(): Brand[] {
       is_placeholder: true,
     };
   };
-  // real brand names and logos supplied by GOODMAX (descriptions still to come)
+  // real brand names and logos supplied by GOODMAX (descriptions still to come); per the owner, B7B, ALG MAX,
+  // GLASMAX, DARCON and BIG ONE are Vistar-Bouti's own brands and the rest are made under GOODMAX licence
   return [
-    base(1, "vistar-bouti", L("Vistar BouTi", "Vistar BouTi", "Vistar BouTi"), "#072f54", false, ""),
-    base(2, "goodmax-x", L("GoodMax", "GoodMax", "GoodMax"), "#072f54", false, ""),
-    base(3, "goodmax", L("GOODMAX", "GOODMAX", "قود ماكس"), "#072f54", false, "/media/still-razor-front.jpg"),
-    base(4, "super-goodmax", L("Super GoodMax", "Super GoodMax", "Super GoodMax"), "#072f54", false, ""),
+    base(1, "vistar-bouti", L("Vistar BouTi", "Vistar BouTi", "Vistar BouTi"), "#072f54", false, "", true),
+    base(2, "goodmax-x", L("GoodMax", "GoodMax", "GoodMax"), "#072f54", false, "", true),
+    base(3, "goodmax", L("GOODMAX", "GOODMAX", "قود ماكس"), "#072f54", false, "/media/still-razor-front.jpg", true),
+    base(4, "super-goodmax", L("Super GoodMax", "Super GoodMax", "Super GoodMax"), "#072f54", false, "", true),
     base(5, "b7b", L("B7B", "B7B", "B7B"), "#072f54", false, ""),
     base(6, "alg-max", L("ALG MAX", "ALG MAX", "ALG MAX"), "#072f54", false, ""),
     base(7, "glasmax", L("GLASMAX", "GLASMAX", "GLASMAX"), "#072f54", false, ""),

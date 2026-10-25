@@ -118,18 +118,24 @@ export const SECTION_DEFINITIONS: Record<SectionType, SectionDefinition> = {
   group_intro: {
     type: "group_intro",
     name: "Group Introduction",
-    description: "The maker's logo beside a brand logo, with the group's story and key figures.",
+    description: "The maker's logo beside a brand logo, each with its brands listed under it, plus the group's story and key figures.",
     fields: [
       eyebrow,
       title,
       body,
       { key: "group_logo_url", type: "media", label: "Group logo (light, for a dark background)" },
       { key: "group_name", type: "text", label: "Group name", help: "Read out in place of the logo by screen readers and search engines." },
-      { key: "group_caption", type: "ltext", label: "Caption under the group logo" },
+      { key: "group_caption", type: "ltext", label: "Caption under the group logo (its own brands)" },
       { key: "brand_logo_url", type: "media", label: "Brand logo beside it (light)" },
       { key: "brand_name", type: "text", label: "Brand name" },
-      { key: "brand_caption", type: "ltext", label: "Caption under the brand logo" },
+      { key: "brand_caption", type: "ltext", label: "Caption under the brand logo (licensed brands)" },
       { key: "brand_url", type: "url", label: "Brand logo link", help: "e.g. /products?brand=goodmax#products. Empty = not a link." },
+      {
+        key: "show_brands",
+        type: "boolean",
+        label: "List the brands under each logo",
+        help: "Brands ticked \"Made under GOODMAX licence\" in Admin › Brands go under the brand logo; the others under the group logo.",
+      },
       {
         key: "facts",
         type: "items",

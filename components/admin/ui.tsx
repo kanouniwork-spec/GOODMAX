@@ -393,6 +393,7 @@ export function FieldsForm({ fields, value, onChange }: { fields: Field[]; value
             return (
               <div key={f.key} className="a-field">
                 <Switch checked={v !== false} onChange={(x) => set(f.key, x)} label={f.label} disabled={readOnly} />
+                {f.help && <small>{f.help}</small>}
               </div>
             );
           case "number":

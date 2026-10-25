@@ -13,7 +13,7 @@ export default async function EditBrand({ params }: { params: Promise<{ id: stri
         collection="brands"
         id={null}
         fields={BRAND_FIELDS}
-        initial={{ name_json: {}, slug: "", description_json: {}, cta_json: { en: "View products", fr: "Voir les produits", ar: "عرض المنتجات" }, logo_url: "", background_url: "", accent_color: "#1d5bd8", visible: true }}
+        initial={{ name_json: {}, slug: "", description_json: {}, cta_json: { en: "View products", fr: "Voir les produits", ar: "عرض المنتجات" }, logo_url: "", background_url: "", accent_color: "#1d5bd8", licensed: false, visible: true }}
         backHref="/admin/brands"
         title="New brand"
       />

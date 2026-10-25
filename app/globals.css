@@ -1425,15 +1425,15 @@ main {
   }
 }
 
-/* group page (Vistar-Bouti): the maker's logo beside the GOODMAX logo, its story and key figures */
+/* group page (Vistar-Bouti): the story and key figures, then the maker's logo beside the GOODMAX logo,
+   each with the brands it makes listed under it */
 .group__inner {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: clamp(32px, 5vw, 72px);
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: clamp(40px, 5vw, 72px) clamp(32px, 5vw, 72px);
   align-items: center;
 }
-/* the logos come first in the page (first thing seen on a phone) but sit beside the text on wide screens */
 .group__text {
   grid-row: 1;
   grid-column: 1;
@@ -1447,76 +1447,15 @@ main {
 .group__text .btn {
   margin-top: 6px;
 }
-.group__lockup {
+.group__facts {
   grid-row: 1;
   grid-column: 2;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: clamp(20px, 3vw, 36px);
-  padding: clamp(32px, 6vw, 88px) clamp(22px, 3vw, 40px);
-  border: 1px solid var(--c-line-dark);
-  border-radius: 24px;
-  background: radial-gradient(90% 70% at 50% 0%, rgba(46, 116, 255, 0.16), transparent 70%) var(--c-ink); /* opaque, so the grid lines stay behind */
-}
-.group__logo {
-  flex: 1 1 0;
-  min-width: 0;
-  margin: 0;
   display: grid;
-  justify-items: center;
-  gap: 16px;
-  text-align: center;
-}
-/* both logos get the same box, so they line up and their captions start on one line */
-.group__logo img {
-  display: block;
-  width: 100%;
-  max-width: 240px;
-  height: clamp(34px, 4.2vw, 56px);
-  object-fit: contain;
-}
-.group__logo figcaption {
-  font-family: var(--f-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--c-on-dark-muted);
-}
-[dir="rtl"] .group__logo figcaption {
-  letter-spacing: 0;
-  font-family: var(--f-body);
-  font-size: 13px;
-}
-.group__join {
-  flex: none;
-  align-self: stretch;
-  width: 1px;
-  background: linear-gradient(to bottom, transparent, rgba(160, 190, 235, 0.45), transparent);
-}
-.group__brand-link {
-  display: block;
-  width: 100%;
-  max-width: 240px;
-  border-radius: 8px;
-  transition: transform var(--d-slow) var(--ease), opacity var(--d-base);
-}
-.group__brand-link:hover,
-.group__brand-link:focus-visible {
-  transform: scale(1.04);
-}
-.group__brand-link:focus-visible {
-  outline: 2px solid #7fb0ff;
-  outline-offset: 8px;
-}
-.group__facts {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
-  gap: 24px clamp(24px, 4vw, 56px);
+  gap: 28px;
   margin: 0;
-  padding-top: 28px;
+}
+.group__facts > div {
+  padding-top: 22px;
   border-top: 1px solid var(--c-line-dark);
 }
 .group__facts dt {
@@ -1534,38 +1473,175 @@ main {
 }
 .group__facts dd {
   margin: 10px 0 0;
-  max-width: 26ch;
+  max-width: 30ch;
   color: var(--c-on-dark-muted);
   line-height: 1.4;
 }
-.group__inner:not(:has(.group__lockup)) {
-  grid-template-columns: 1fr;
+.group__tree {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+}
+.group__family {
+  flex: var(--n, 1) 1 0;
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  padding: clamp(28px, 3.4vw, 44px) clamp(16px, 2.4vw, 32px);
+  border: 1px solid var(--c-line-dark);
+  border-radius: 24px;
+  background: radial-gradient(90% 60% at 50% 0%, rgba(46, 116, 255, 0.16), transparent 70%) var(--c-ink); /* opaque, so the grid lines stay behind */
+}
+.group__logo {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  width: 100%;
+  text-align: center;
+}
+.group__logo img {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  height: clamp(36px, 4vw, 54px);
+  object-fit: contain;
+}
+.group__logo figcaption {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-on-dark-muted);
+}
+[dir="rtl"] .group__logo figcaption {
+  letter-spacing: 0;
+  font-family: var(--f-body);
+  font-size: 13px;
+}
+.group__brand-link {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  border-radius: 8px;
+  transition: transform var(--d-slow) var(--ease);
+}
+.group__brand-link img {
+  margin-inline: auto;
+}
+.group__brand-link:hover,
+.group__brand-link:focus-visible {
+  transform: scale(1.04);
+}
+.group__brand-link:focus-visible {
+  outline: 2px solid #7fb0ff;
+  outline-offset: 8px;
+}
+/* the stem from the logo down to its brands */
+.group__brands {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin: 28px 0 0;
+  padding: 28px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--c-line-dark);
+}
+.group__brands::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7fb0ff;
+  box-shadow: 0 0 0 4px rgba(127, 176, 255, 0.16);
+  transform: translate(-50%, -50%);
+}
+.group__brands li {
+  flex: 0 1 158px;
+  min-width: 0;
+}
+.family-tile {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 12px;
+  height: 100%;
+  min-height: 128px;
+  padding: 16px 12px 14px;
+  border: 1px solid var(--c-line-dark);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  color: rgba(226, 235, 248, 0.7);
+  text-align: center;
+  transition:
+    color var(--d-base) var(--ease),
+    border-color var(--d-base) var(--ease),
+    background-color var(--d-base) var(--ease),
+    transform var(--d-slow) var(--ease);
+}
+.family-tile:hover,
+.family-tile:focus-visible {
+  color: #fff;
+  border-color: rgba(127, 176, 255, 0.55);
+  background-color: rgba(46, 116, 255, 0.1);
+  transform: translateY(-3px);
+}
+.family-tile__logo {
+  display: grid;
+  place-items: center;
+}
+.family-tile .brand-logo__mark {
+  height: 48px;
+}
+.family-tile .brand-logo__name {
+  font-size: 18px;
+  white-space: normal;
+}
+.family-tile b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-on-dark);
 }
 @media (max-width: 900px) {
   .group__inner {
     grid-template-columns: 1fr;
   }
   .group__text,
-  .group__lockup {
+  .group__facts {
     grid-row: auto;
     grid-column: auto;
   }
-  /* the panel spans the full width here, so the logos can be larger */
+  .group__facts {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    gap: 24px;
+  }
+  .group__tree {
+    flex-direction: column;
+  }
   .group__logo img {
-    height: clamp(34px, 7vw, 56px);
+    height: clamp(36px, 7vw, 54px);
   }
 }
 @media (max-width: 420px) {
-  .group__lockup {
-    gap: 16px;
-    padding: 28px 16px;
+  .group__family {
+    padding: 26px 14px;
   }
-  .group__logo {
-    gap: 12px;
+  .group__brands li {
+    flex-basis: calc(50% - 5px);
   }
-  .group__logo figcaption {
-    font-size: 10px;
-    letter-spacing: 0.1em;
+  .family-tile {
+    min-height: 112px;
+  }
+  .family-tile .brand-logo__mark {
+    height: 40px;
   }
 }
 

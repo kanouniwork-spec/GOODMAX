@@ -725,43 +725,21 @@ export async function SectionRenderer({ section, index, bucket, brand: brandSlug
 
     /* ------------------------------------------------------------------ */
     case "group_intro": {
-      const groupLogo = x.S("group_logo_url");
-      const brandLogo = x.S("brand_logo_url");
-      const brandUrl = x.S("brand_url");
       const facts = ((x.c.facts as C[]) ?? [])
         .map((f) => ({ value: loc(f.value as LocalizedText, locale), label: loc(f.label as LocalizedText, locale) }))
         .filter((f) => f.value || f.label);
+      const brandLogo = x.S("brand_logo_url");
+      // each logo lists its brands: licensed ones under the brand logo (GOODMAX), the maker's own under the group logo
+      const brands = x.c.show_brands === false ? [] : await getBrands();
+      const families = [
+        { key: "group", logo: x.S("group_logo_url"), name: x.S("group_name"), caption: x.L("group_caption"), href: "", brands: brands.filter((b) => !b.licensed || !brandLogo) },
+        { key: "brand", logo: brandLogo, name: x.S("brand_name"), caption: x.L("brand_caption"), href: x.S("brand_url"), brands: brandLogo ? brands.filter((b) => b.licensed) : [] },
+      ].filter((f) => f.logo || f.brands.length > 0);
       const H = index === 0 ? "h1" : "h2";
-      // eslint-disable-next-line @next/next/no-img-element
-      const brandImg = brandLogo && <img src={brandLogo} alt={x.S("brand_name")} />;
       return (
         <section className="section section--dark group" id={anchor}>
           <div className="grid-lines" />
           <div className="container group__inner">
-            {(groupLogo || brandLogo) && (
-              <div className="group__lockup reveal">
-                {groupLogo && (
-                  <figure className="group__logo">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={groupLogo} alt={x.S("group_name")} />
-                    {x.L("group_caption") && <figcaption>{x.L("group_caption")}</figcaption>}
-                  </figure>
-                )}
-                {groupLogo && brandLogo && <span className="group__join" aria-hidden="true" />}
-                {brandLogo && (
-                  <figure className="group__logo">
-                    {brandUrl ? (
-                      <Link href={brandUrl} className="group__brand-link">
-                        {brandImg}
-                      </Link>
-                    ) : (
-                      brandImg
-                    )}
-                    {x.L("brand_caption") && <figcaption>{x.L("brand_caption")}</figcaption>}
-                  </figure>
-                )}
-              </div>
-            )}
             <div className="group__text reveal">
               {x.L("eyebrow") && <span className="eyebrow">{x.L("eyebrow")}</span>}
               {x.L("title") && <H className="display-lg">{x.L("title")}</H>}
@@ -772,6 +750,49 @@ export async function SectionRenderer({ section, index, bucket, brand: brandSlug
                 </Link>
               )}
             </div>
+            {families.length > 0 && (
+              <div className="group__tree">
+                {families.map((f) => {
+                  // eslint-disable-next-line @next/next/no-img-element
+                  const img = f.logo ? <img src={f.logo} alt={f.name} /> : null;
+                  return (
+                    <div key={f.key} className="group__family reveal" style={{ ["--n" as string]: Math.max(1, f.brands.length) }}>
+                      <figure className="group__logo">
+                        {img && f.href ? (
+                          <Link href={f.href} className="group__brand-link">
+                            {img}
+                          </Link>
+                        ) : (
+                          img
+                        )}
+                        {f.caption && <figcaption>{f.caption}</figcaption>}
+                      </figure>
+                      {f.brands.length > 0 && (
+                        <ul className="group__brands" aria-label={f.caption || f.name}>
+                          {f.brands.map((b) => {
+                            const name = loc(b.name_json, locale);
+                            return (
+                              <li key={b.id}>
+                                <Link href={`/products?brand=${encodeURIComponent(b.slug)}#products`} className="family-tile">
+                                  <span className="family-tile__logo">
+                                    {b.logo_url ? (
+                                      <span className="brand-logo__mark" style={{ ["--logo" as string]: `url("${b.logo_url}")` }} />
+                                    ) : (
+                                      <span className="brand-logo__name">{name}</span>
+                                    )}
+                                  </span>
+                                  <b>{name}</b>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {facts.length > 0 && (
               <dl className="group__facts reveal">
                 {facts.map((f, i) => (
