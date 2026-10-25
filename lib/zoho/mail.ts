@@ -299,6 +299,17 @@ export async function markRead(accountId: string, messageId: string) {
   await call(await connected(), `/api/accounts/${enc(accountId)}/updatemessage`, { method: "PUT", body: { mode: "markAsRead", messageId: [messageId] } });
 }
 
+/** Gmail's Delete: Zoho moves the mail to Trash; with `forever` it is deleted for good (expunge). One mail per call. */
+export async function deleteMessage(accountId: string, folderId: string, messageId: string, forever = false) {
+  const q = forever ? "?expunge=true" : "";
+  await call(await connected(), `/api/accounts/${enc(accountId)}/folders/${enc(folderId)}/messages/${enc(messageId)}${q}`, { method: "DELETE" });
+}
+
+/** Moves mails to another folder, e.g. back to the Inbox from Trash or Spam. */
+export async function moveMessages(accountId: string, messageIds: string[], destFolderId: string) {
+  await call(await connected(), `/api/accounts/${enc(accountId)}/updatemessage`, { method: "PUT", body: { mode: "moveMessage", messageId: messageIds, destfolderId: destFolderId } });
+}
+
 /** A file already uploaded to Zoho's file store, ready to go with a mail. */
 export type AttachmentRef = { storeName: string; attachmentPath: string; attachmentName: string };
 export type Outgoing = { from: string; to: string; cc?: string; bcc?: string; subject: string; html: string; attachments?: AttachmentRef[] };

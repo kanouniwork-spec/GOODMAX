@@ -24,6 +24,8 @@ const PATHS = {
   send: "M21 3 10 14M21 3l-7 18-4-7-7-4z",
   power: "M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0",
   download: "M12 4v11M7.5 10.5 12 15l4.5-4.5M4 19.5h16",
+  check: "M5 12.5 9.5 17 19 7",
+  restore: "M3 13h5l1.5 3h5l1.5-3h5M5.5 5h13L21 13v6H3v-6zM12 7v6M9.5 9.5 12 7l2.5 2.5",
 } as const;
 
 export type MailIconName = keyof typeof PATHS;

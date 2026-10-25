@@ -4,6 +4,7 @@ import { attachmentInfo, markRead, messageContent, messageDetails, type MailFile
 import { firstAddress, folderHref, MailError, MailFrame, mailDate, people, type Mailbox, type SP } from "@/components/admin/MailFrame";
 import { ReplyBox } from "@/components/admin/MailCompose";
 import { MailBody } from "@/components/admin/MailClient";
+import { MailReadActions, type FolderKind } from "@/components/admin/MailList";
 import { Avatar, MailIcon } from "@/components/admin/MailIcons";
 
 const num = (v: string | string[] | undefined) => (typeof v === "string" && /^\d{1,30}$/.test(v) ? v : "");
@@ -42,7 +43,9 @@ async function Message({ box, account, folder, id }: { box: Mailbox; account: st
     const subject = /^(re|ref|rép|رد)\s*:/i.test(details.subject) ? details.subject : `Re: ${details.subject}`;
     const sender = details.sender && details.sender !== details.from ? details.sender : "";
     const address = firstAddress(details.from) || details.from;
-    const folderName = box.folders.find((f) => f.folderId === folder)?.name ?? "Inbox";
+    const open = box.folders.find((f) => f.folderId === folder);
+    const folderName = open?.name ?? "Inbox";
+    const kind: FolderKind = /trash/i.test(open?.type ?? "") ? "trash" : /spam/i.test(open?.type ?? "") ? "spam" : "mail";
     return (
       <article className="mx-card mx-read">
         <div className="mx-toolbar">
@@ -50,6 +53,7 @@ async function Message({ box, account, folder, id }: { box: Mailbox; account: st
             <MailIcon name="left" />
           </Link>
           <span className="mx-toolbar__crumb">{folderName}</span>
+          <MailReadActions accountId={account} folderId={folder} id={id} kind={kind} back={folderHref(box, folder)} />
         </div>
         <div className="mx-pad">
           <h2 className="mx-read__subject" dir="auto">

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { listMessages } from "@/lib/zoho/mail";
 import { folderHref, listDate, MailError, MailFrame, one, people, type Mailbox, type SP } from "@/components/admin/MailFrame";
-import { Avatar, MailIcon } from "@/components/admin/MailIcons";
+import { MailIcon } from "@/components/admin/MailIcons";
+import { MailList, type FolderKind, type MailRow } from "@/components/admin/MailList";
 
 const PAGE = 25;
 
@@ -27,69 +28,61 @@ async function Inbox({ box, sp }: { box: Mailbox; sp: SP }) {
     return <MailError error={e} />;
   }
   const sent = /sent|outbox|draft/i.test(folder.type);
+  const kind: FolderKind = /trash/i.test(folder.type) ? "trash" : /spam/i.test(folder.type) ? "spam" : "mail";
   const first = (page - 1) * PAGE + 1;
   const shown = list.slice(0, PAGE);
-  return (
-    <section className="mx-card">
-      <div className="mx-toolbar">
-        <h2>{folder.name}</h2>
-        <Link className="mx-iconbtn" href={folderHref(box, folder.folderId, page > 1 ? { page } : {})} title="Refresh" aria-label="Refresh">
-          <MailIcon name="refresh" />
+  const rows: MailRow[] = shown.map((m) => ({
+    id: m.messageId,
+    href: `/admin/mail/read?${new URLSearchParams({ account: box.account.accountId, folder: m.folderId, id: m.messageId })}`,
+    who: sent ? people(m.to) || m.to : m.sender || m.from,
+    to: sent,
+    subject: m.subject,
+    summary: m.summary,
+    unread: m.unread,
+    attachment: m.attachment,
+    date: listDate(m.time),
+  }));
+  const nav = (
+    <>
+      <Link className="mx-iconbtn" href={folderHref(box, folder.folderId, page > 1 ? { page } : {})} title="Refresh" aria-label="Refresh">
+        <MailIcon name="refresh" />
+      </Link>
+      <span className="mx-toolbar__count">{shown.length ? `${first}–${first + shown.length - 1}` : "0"}</span>
+      {page > 1 ? (
+        <Link className="mx-iconbtn" href={folderHref(box, folder.folderId, { page: page - 1 })} title="Newer" aria-label="Newer">
+          <MailIcon name="left" />
         </Link>
-        <span className="mx-toolbar__count">{shown.length ? `${first}–${first + shown.length - 1}` : "0"}</span>
-        {page > 1 ? (
-          <Link className="mx-iconbtn" href={folderHref(box, folder.folderId, { page: page - 1 })} title="Newer" aria-label="Newer">
-            <MailIcon name="left" />
-          </Link>
-        ) : (
-          <span className="mx-iconbtn" aria-disabled="true">
-            <MailIcon name="left" />
-          </span>
-        )}
-        {list.length > PAGE ? (
-          <Link className="mx-iconbtn" href={folderHref(box, folder.folderId, { page: page + 1 })} title="Older" aria-label="Older">
-            <MailIcon name="right" />
-          </Link>
-        ) : (
-          <span className="mx-iconbtn" aria-disabled="true">
-            <MailIcon name="right" />
-          </span>
-        )}
-      </div>
-      {shown.length === 0 ? (
+      ) : (
+        <span className="mx-iconbtn" aria-disabled="true">
+          <MailIcon name="left" />
+        </span>
+      )}
+      {list.length > PAGE ? (
+        <Link className="mx-iconbtn" href={folderHref(box, folder.folderId, { page: page + 1 })} title="Older" aria-label="Older">
+          <MailIcon name="right" />
+        </Link>
+      ) : (
+        <span className="mx-iconbtn" aria-disabled="true">
+          <MailIcon name="right" />
+        </span>
+      )}
+    </>
+  );
+  return (
+    <MailList
+      key={`${box.account.accountId}-${folder.folderId}-${page}`}
+      accountId={box.account.accountId}
+      folderId={folder.folderId}
+      kind={kind}
+      title={folder.name}
+      nav={nav}
+      rows={rows}
+      empty={
         <div className="mx-empty">
-          <MailIcon name="inbox" size={40} />
+          <MailIcon name={kind === "trash" ? "trash" : "inbox"} size={40} />
           <p>No mail in {folder.name}.</p>
         </div>
-      ) : (
-        <ul className="mx-list">
-          {shown.map((m) => {
-            const who = sent ? people(m.to) || m.to : m.sender || m.from;
-            return (
-              <li key={m.messageId}>
-                <Link
-                  className={`mx-row${m.unread ? " is-unread" : ""}`}
-                  href={`/admin/mail/read?${new URLSearchParams({ account: box.account.accountId, folder: m.folderId, id: m.messageId })}`}
-                >
-                  <Avatar name={who} />
-                  <span className="mx-row__who" dir="auto">
-                    {sent && <small>To: </small>}
-                    {who}
-                  </span>
-                  <span className="mx-row__text">
-                    <b dir="auto">{m.subject || "(no subject)"}</b>
-                    <span dir="auto">{m.summary}</span>
-                  </span>
-                  <span className="mx-row__meta">
-                    {m.attachment && <MailIcon name="clip" size={15} />}
-                    <time>{listDate(m.time)}</time>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
+      }
+    />
   );
 }

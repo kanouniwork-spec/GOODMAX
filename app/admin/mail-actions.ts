@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/auth/session";
 import { backend, db, newId } from "@/lib/data";
 import type { ActionResult } from "./actions";
-import { addAlias, addUser, disconnect, getConnection, listAccounts, listUsers, replyMessage, sendMessage, type AttachmentRef, type Outgoing } from "@/lib/zoho/mail";
+import { addAlias, addUser, deleteMessage, disconnect, getConnection, listAccounts, listFolders, listUsers, moveMessages, replyMessage, sendMessage, type AttachmentRef, type Outgoing } from "@/lib/zoho/mail";
 import { uploadSlot } from "@/lib/zoho/uploads";
 
 const ok = <T,>(data?: T): ActionResult<T> => ({ ok: true, data });
@@ -101,6 +101,64 @@ function localPart(v: string) {
   const l = v.trim().toLowerCase().replace(/@.*$/, "");
   if (!LOCAL.test(l)) throw new Error("Use letters, numbers, dots, dashes or underscores before the @ (for example contact).");
   return l;
+}
+
+/** Mails picked in a folder of a connected mailbox (the list's tick boxes, or the mail open). */
+export type MailPick = { accountId: string; folderId: string; ids: string[] };
+
+const ID = /^\d{1,30}$/;
+const isTrash = (type: string) => /trash|spam/i.test(type);
+
+async function checkPick(p: MailPick) {
+  const ids = [...new Set(Array.isArray(p?.ids) ? p.ids : [])];
+  if (!ID.test(p?.accountId ?? "") || !ID.test(p?.folderId ?? "") || !ids.length || ids.length > 100 || !ids.every((id) => typeof id === "string" && ID.test(id)))
+    throw new Error("Pick the mails again.");
+  if (!(await listAccounts()).some((a) => a.accountId === p.accountId)) throw new Error("This mailbox is not connected any more.");
+  const folders = await listFolders(p.accountId);
+  const folder = folders.find((f) => f.folderId === p.folderId);
+  if (!folder) throw new Error("This folder no longer exists in Zoho.");
+  return { ids, folder, folders };
+}
+
+/** Zoho deletes one mail per call: a few at a time, then one message for whatever failed. */
+async function eachMail(ids: string[], fn: (id: string) => Promise<unknown>) {
+  const failed: string[] = [];
+  for (let i = 0; i < ids.length; i += 5) {
+    const done = await Promise.allSettled(ids.slice(i, i + 5).map(fn));
+    done.forEach((r) => r.status === "rejected" && failed.push(r.reason instanceof Error ? r.reason.message : String(r.reason)));
+  }
+  if (failed.length === ids.length) throw new Error(failed[0]);
+  if (failed.length) throw new Error(`${ids.length - failed.length} of ${ids.length} done. ${failed[0]}`);
+}
+
+/** Delete: to Trash. In Trash or Spam it deletes for good instead (only from there, after the page has asked). */
+export async function deleteMail(p: MailPick): Promise<ActionResult<"trash" | "forever">> {
+  try {
+    const user = await authorize("mail.manage");
+    const { ids, folder } = await checkPick(p);
+    const forever = isTrash(folder.type);
+    await eachMail(ids, (id) => deleteMessage(p.accountId, p.folderId, id, forever));
+    await audit(user.id, forever ? "mail.delete" : "mail.trash", `${folder.name}: ${ids.length}`);
+    return ok(forever ? "forever" : "trash");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Trash or Spam → Inbox (Gmail's "Move to Inbox" and "Not spam"). */
+export async function restoreMail(p: MailPick): Promise<ActionResult> {
+  try {
+    const user = await authorize("mail.manage");
+    const { ids, folder, folders } = await checkPick(p);
+    const inbox = folders.find((f) => /inbox/i.test(f.type));
+    if (!inbox) throw new Error("This mailbox has no Inbox folder.");
+    if (inbox.folderId === folder.folderId) return ok();
+    await moveMessages(p.accountId, ids, inbox.folderId);
+    await audit(user.id, "mail.restore", `${folder.name}: ${ids.length}`);
+    return ok();
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function addMailAlias(zuid: string, local: string): Promise<ActionResult<string>> {
