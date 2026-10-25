@@ -13,6 +13,7 @@ import { TimelineProgress } from "./TimelineProgress";
 import { ChipBar } from "./ChipBar";
 import { ContactForm, DistributorForm } from "./forms";
 import { LocationsExplorer } from "./LocationsExplorer";
+import { MapPinTip, type PinEntry } from "./MapPinTip";
 import { PLATFORM_NAMES, SocialIcon } from "@/components/site/SocialIcon";
 
 type C = Record<string, unknown>;
@@ -400,9 +401,22 @@ export async function SectionRenderer({ section, index, bucket, brand: brandSlug
         const lat = own ? l.latitude : w?.latitude;
         const lng = own ? l.longitude : w?.longitude;
         if (lat == null || lng == null) return [];
-        const label = [loc(l.name_json, locale), t(`locations.type.${l.location_type}` as "locations.type.other"), w && loc(w.name_json, locale)].filter(Boolean).join(" · ");
-        return [{ id: l.id, lat, lng, label, href: l.maps_url || (own ? googleMapsAt(lat, lng) : "") }];
+        const type = t(`locations.type.${l.location_type}` as "locations.type.other");
+        return [
+          {
+            id: l.id,
+            lat,
+            lng,
+            name: loc(l.name_json, locale) || type,
+            type,
+            wilaya: w ? loc(w.name_json, locale) : "",
+            place: l.municipality || loc(l.address_json, locale),
+            phone: l.phone,
+            href: l.maps_url || (own ? googleMapsAt(lat, lng) : ""),
+          },
+        ];
       });
+      const spots = placePins(pins);
       return (
         <section className="section section--dark" id={anchor} style={index === 0 ? { paddingTop: "calc(var(--header-h) + 96px)" } : undefined}>
           <div className="grid-lines" />
@@ -453,12 +467,14 @@ export async function SectionRenderer({ section, index, bucket, brand: brandSlug
               </div>
             </div>
             <div className="reveal">
-              <NetworkMap
-                nodes={wilayas.map((w) => ({ id: w.id, lat: w.latitude, lng: w.longitude, active: covered.has(w.id), name: loc(w.name_json, locale) }))}
-                pins={pins}
-                openLabel={t("network.open_map")}
-              />
-              {pins.some((p) => p.href) && <p className="network-map__hint">{t("network.pin_hint")}</p>}
+              <MapPinTip spots={spots.map((s) => s.pins)} openLabel={t("network.view_map")}>
+                <NetworkMap
+                  nodes={wilayas.map((w) => ({ id: w.id, lat: w.latitude, lng: w.longitude, active: covered.has(w.id), name: loc(w.name_json, locale) }))}
+                  spots={spots}
+                  openLabel={t("network.open_map")}
+                />
+              </MapPinTip>
+              {spots.length > 0 && <p className="network-map__hint">{t("network.pin_hint")}</p>}
             </div>
           </div>
         </section>
@@ -702,15 +718,17 @@ const project = (lng: number, lat: number): [number, number] => [(lng - LNG0) * 
 const DOT_STEP = 0.42 * K;
 const DOT_ORIGIN = project(-8.8, 18.8);
 
-type MapPin = { id: string; lat: number; lng: number; label: string; href: string };
+type MapPin = PinEntry & { lat: number; lng: number };
+type Spot = { x: number; y: number; pins: MapPin[] };
 
-const PIN_GAP = 16; // map units between pins that share a spot, about one pin's width once scaled up on phones
+const PIN_GAP = 16; // map units: pins closer than this (about a pin's width once scaled up on phones) share one spot
 
 /**
- * Projects pins onto the map; pins that would overlap (e.g. two distributors in one city) are set side by side.
- * Pins further south are drawn last, so a pin's head is never covered by the tip of the pin just north of it.
+ * Projects pins onto the map and merges those that would overlap (e.g. two distributors in one city) into one
+ * spot, shown as a single pin with a count that opens a list. Spots further south are drawn last, so a pin's
+ * head is never covered by the tip of the pin just north of it.
  */
-function placePins(pins: MapPin[]) {
+function placePins(pins: MapPin[]): Spot[] {
   const groups: { at: [number, number]; pins: MapPin[] }[] = [];
   for (const pin of pins) {
     const at = project(pin.lng, pin.lat);
@@ -718,24 +736,21 @@ function placePins(pins: MapPin[]) {
     if (near) near.pins.push(pin);
     else groups.push({ at, pins: [pin] });
   }
-  return groups.flatMap((g) => {
-    const perRow = Math.min(g.pins.length, 4);
-    return g.pins.map((pin, i) => {
-      const row = Math.floor(i / perRow);
-      const inRow = Math.min(perRow, g.pins.length - row * perRow);
-      const col = i % perRow;
-      return { ...pin, x: g.at[0] + (col - (inRow - 1) / 2) * PIN_GAP, y: g.at[1] + row * PIN_GAP * 1.4 };
-    });
-  }).sort((a, b) => a.y - b.y);
+  return groups
+    .map((g) => {
+      const xy = g.pins.map((p) => project(p.lng, p.lat));
+      return { x: xy.reduce((a, [x]) => a + x, 0) / xy.length, y: xy.reduce((a, [, y]) => a + y, 0) / xy.length, pins: g.pins };
+    })
+    .sort((a, b) => a.y - b.y);
 }
 
 function NetworkMap({
   nodes,
-  pins = [],
+  spots = [],
   openLabel = "",
 }: {
   nodes: { id: string; lat: number | null; lng: number | null; active: boolean; name: string }[];
-  pins?: MapPin[];
+  spots?: Spot[];
   openLabel?: string;
 }) {
   const pts = nodes.filter((n) => n.lat != null && n.lng != null).map((n) => ({ ...n, p: project(n.lng!, n.lat!) }));
@@ -761,7 +776,7 @@ function NetworkMap({
     <svg
       className="network-map"
       viewBox={`0 0 ${w.toFixed(0)} ${h.toFixed(0)}`}
-      role={pins.some((p) => p.href) ? undefined : "img"}
+      role={spots.length ? undefined : "img"}
       aria-label="Algeria network"
     >
       <defs>
@@ -793,24 +808,33 @@ function NetworkMap({
           <circle className={`node${n.active ? " node--active" : ""}`} cx={n.p[0]} cy={n.p[1]} r={n.active ? 3.2 : 2.2} />
         </g>
       ))}
-      {placePins(pins).map((p) => {
+      {spots.map((s, i) => {
+        const one = s.pins.length === 1 ? s.pins[0] : null;
+        const label = s.pins.map((p) => [p.name, p.type, p.wilaya].filter(Boolean).join(" · ")).join("; ");
         const body = (
           <g className="pin__body">
-            <title>{p.label}</title>
             <circle className="pin__glow" r={4} />
             <circle className="pin__hit" cy={-10} r={8.5} />
             <path className="pin__mark" d="M0 0C-1.6-3.6-6-6.4-6-10.6a6 6 0 1 1 12 0C6-6.4 1.6-3.6 0 0Z" />
-            <circle className="pin__dot" cy={-10.6} r={2.3} />
+            {one ? (
+              <circle className="pin__dot" cy={-10.6} r={2.3} />
+            ) : (
+              <text className="pin__count" y={-10.6} dy="0.35em" textAnchor="middle">
+                {s.pins.length}
+              </text>
+            )}
           </g>
         );
         return (
-          <g key={p.id} transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
-            {p.href ? (
-              <a className="pin" href={p.href} target="_blank" rel="noopener noreferrer" aria-label={`${p.label} (${openLabel})`}>
+          <g key={s.pins[0].id} transform={`translate(${s.x.toFixed(1)} ${s.y.toFixed(1)})`}>
+            {one?.href ? (
+              <a className="pin" href={one.href} target="_blank" rel="noopener noreferrer" aria-label={`${label} (${openLabel})`} data-spot={i}>
                 {body}
               </a>
             ) : (
-              <g className="pin pin--static">{body}</g>
+              <g className={`pin${one ? " pin--static" : " pin--group"}`} role="button" tabIndex={0} aria-label={label} data-spot={i}>
+                {body}
+              </g>
             )}
           </g>
         );
