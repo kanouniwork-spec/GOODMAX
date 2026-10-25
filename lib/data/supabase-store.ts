@@ -95,6 +95,12 @@ export class SupabaseStore implements DataStore {
     return data as Collections[K];
   }
   async update<K extends CollectionName>(c: K, id: string, patch: Partial<Collections[K]>) {
+    // an empty patch (e.g. only a user's password changed) updates no row, so .single() would fail
+    if (Object.values(patch).every((v) => v === undefined)) {
+      const row = await this.get(c, id);
+      if (!row) throw new Error(`Supabase update ${c}: ${id} not found`);
+      return row;
+    }
     const { data, error } = await this.db.from(c).update(patch as never).eq("id", id).select("*").single();
     fail(error, `update ${c}`);
     return data as Collections[K];
