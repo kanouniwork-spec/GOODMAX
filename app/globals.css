@@ -1542,6 +1542,59 @@ main {
   stroke: rgba(160, 190, 235, 0.22);
   stroke-width: 1;
 }
+/* location pins (Admin › Locations); the tip sits on the spot, scaling keeps it there */
+.network-map .pin__body {
+  transform-origin: 0 0;
+  transition: transform 0.25s var(--ease-in-out);
+}
+.network-map a.pin:hover .pin__body,
+.network-map a.pin:focus-visible .pin__body {
+  transform: scale(1.3);
+}
+.network-map a.pin {
+  cursor: pointer;
+  outline: none;
+}
+.network-map .pin__hit {
+  fill: transparent;
+}
+.network-map .pin__glow {
+  fill: rgba(77, 141, 255, 0.45);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 3.2s var(--ease-in-out) infinite;
+}
+.network-map .pin__mark {
+  fill: #1d5bd8;
+  stroke: #fff;
+  stroke-width: 1.2;
+}
+.network-map .pin--static .pin__mark {
+  fill: #4a6a9c;
+}
+.network-map a.pin:focus-visible .pin__mark {
+  stroke: #ffd24a;
+  stroke-width: 2;
+}
+.network-map .pin__dot {
+  fill: #fff;
+}
+.network-map__hint {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--c-on-dark-muted);
+  text-align: center;
+}
+@media (max-width: 600px) {
+  /* pins stay big enough to tap when the map shrinks */
+  .network-map .pin__body {
+    transform: scale(1.5);
+  }
+  .network-map a.pin:hover .pin__body,
+  .network-map a.pin:focus-visible .pin__body {
+    transform: scale(1.7);
+  }
+}
 @keyframes pulse {
   0%,
   100% {

@@ -11,7 +11,7 @@ export default async function Locations() {
       <div className="a-top">
         <div>
           <h1>Locations & Maps</h1>
-          <p>Distributors, points of sale, offices and factory. Locations with coordinates appear on the map and light up their wilaya on the network visual.</p>
+          <p>Distributors, points of sale, offices and factory. Each visible location puts a pin on its wilaya on the website map; with a Google Maps link, clicking the pin opens that link.</p>
         </div>
         <div className="a-actions">
           <Link className="a-btn" href="/admin/locations/wilayas">
@@ -30,7 +30,7 @@ export default async function Locations() {
           return {
             id: l.id,
             title: loc(l.name_json, "en"),
-            sub: `${l.location_type} · ${w ? loc(w.name_json, "en") : "no wilaya"}${l.latitude != null ? "" : " · no coordinates"}`,
+            sub: `${l.location_type} · ${w ? loc(w.name_json, "en") : "no wilaya"}${l.maps_url ? "" : " · no Google Maps link"}`,
             visible: l.visible,
           };
         })}

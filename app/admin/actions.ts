@@ -23,6 +23,7 @@ import { emptyContent, SECTION_DEFINITIONS } from "@/lib/sections/schema";
 import { contrast, isHex } from "@/lib/appearance";
 import { PIXEL_INFO, validPixelId } from "@/lib/pixels";
 import { serviceClient } from "@/lib/data/supabase-store";
+import { coordsFromMapsText } from "@/lib/maps";
 
 export type ActionResult<T = unknown> = { ok: true; data?: T } | { ok: false; error: string };
 
@@ -107,6 +108,54 @@ function sanitize<K extends CollectionName>(c: K, data: Record<string, unknown>)
   return d as Partial<Collections[K]>;
 }
 
+/* Google's short share links (maps.app.goo.gl) are followed to the full link, which holds the coordinates. */
+const SHORT_LINK_HOST = /^(maps\.app\.goo\.gl|goo\.gl|g\.co)$/i;
+const GOOGLE_HOST = /(^|\.)(google\.(com|dz|fr|[a-z]{2}|co\.[a-z]{2}|com\.[a-z]{2})|goo\.gl|g\.co)$/i;
+
+async function coordsFromMapsLink(link: string) {
+  let url = link;
+  const signal = AbortSignal.timeout(5000); // one budget for every hop, so a slow link never stalls the save
+  for (let hop = 0; hop < 4; hop++) {
+    const found = coordsFromMapsText(url);
+    if (found) return found;
+    let u: URL;
+    try {
+      u = new URL(url);
+    } catch {
+      return null;
+    }
+    // only Google addresses are fetched, and only to read where they redirect
+    if (u.protocol !== "https:" || !(hop === 0 ? SHORT_LINK_HOST : GOOGLE_HOST).test(u.hostname)) return null;
+    const res = await fetch(u, { redirect: "manual", signal, cache: "no-store" }).catch(() => null);
+    const next = res?.headers.get("location");
+    await res?.body?.cancel().catch(() => {});
+    if (!next) return null;
+    url = new URL(next, u).toString();
+  }
+  return null;
+}
+
+/**
+ * A location's Google Maps link places its pin on the network map: empty coordinates, or ones kept from
+ * the previous link, are taken from the new link when it carries them.
+ */
+async function placeFromMapsLink(d: Record<string, unknown>, id: string | null) {
+  if (!("maps_url" in d)) return;
+  const link = String(d.maps_url ?? "").trim();
+  d.maps_url = link;
+  if (!link) return;
+  if (!/^https:\/\//i.test(link)) throw new Error("The Google Maps link must be a full address starting with https://");
+  const prev = id ? await db().get("locations", id) : null;
+  const empty = d.latitude == null || d.longitude == null;
+  const stale = !!prev && prev.maps_url !== link && d.latitude === prev.latitude && d.longitude === prev.longitude;
+  if (!empty && !stale) return;
+  const found = await coordsFromMapsLink(link);
+  if (found) {
+    d.latitude = found.lat;
+    d.longitude = found.lng;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Generic CRUD                                                        */
 /* ------------------------------------------------------------------ */
@@ -119,6 +168,7 @@ export async function saveRecord<K extends CollectionName>(
   try {
     const user = await authorize(permFor(c));
     const clean = sanitize(c, data) as Record<string, unknown>;
+    if (c === "locations") await placeFromMapsLink(clean, id);
     const now = new Date().toISOString();
     const stamp = ["page_sections", "brands", "products"].includes(c) ? { updated_at: now, updated_by: user.email } : {};
     if (id) {

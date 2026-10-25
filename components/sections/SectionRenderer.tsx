@@ -4,7 +4,7 @@ import { loc, hasText } from "@/lib/i18n";
 import { getI18n } from "@/lib/i18n/server";
 import { getBrands, getLocations, getProducts, getSetting, getSocials, getWilayas } from "@/lib/content/queries";
 import { db } from "@/lib/data";
-import { osmEmbed } from "@/lib/maps";
+import { googleMapsAt, isOnMap, osmEmbed } from "@/lib/maps";
 import { webImage } from "@/lib/media";
 import { ALGERIA_OUTLINE } from "@/data/wilayas";
 import { VideoStory, type StoryStage } from "./VideoStory";
@@ -392,6 +392,17 @@ export async function SectionRenderer({ section, index, bucket, brand: brandSlug
       const [wilayas, locations, allWilayas] = await Promise.all([getWilayas(), getLocations(), db().list("wilayas")]);
       const covered = new Set(locations.map((l) => l.wilaya));
       const general = await getSetting("general");
+      const wilayaById = new Map(allWilayas.map((w) => [w.id, w]));
+      // one pin per visible location: at its own coordinates, otherwise on its wilaya
+      const pins = locations.flatMap((l) => {
+        const w = wilayaById.get(l.wilaya);
+        const own = l.latitude != null && l.longitude != null && isOnMap(l.latitude, l.longitude);
+        const lat = own ? l.latitude : w?.latitude;
+        const lng = own ? l.longitude : w?.longitude;
+        if (lat == null || lng == null) return [];
+        const label = [loc(l.name_json, locale), t(`locations.type.${l.location_type}` as "locations.type.other"), w && loc(w.name_json, locale)].filter(Boolean).join(" · ");
+        return [{ id: l.id, lat, lng, label, href: l.maps_url || (own ? googleMapsAt(lat, lng) : "") }];
+      });
       return (
         <section className="section section--dark" id={anchor} style={index === 0 ? { paddingTop: "calc(var(--header-h) + 96px)" } : undefined}>
           <div className="grid-lines" />
@@ -442,7 +453,12 @@ export async function SectionRenderer({ section, index, bucket, brand: brandSlug
               </div>
             </div>
             <div className="reveal">
-              <NetworkMap nodes={wilayas.map((w) => ({ id: w.id, lat: w.latitude, lng: w.longitude, active: covered.has(w.id), name: loc(w.name_json, locale) }))} />
+              <NetworkMap
+                nodes={wilayas.map((w) => ({ id: w.id, lat: w.latitude, lng: w.longitude, active: covered.has(w.id), name: loc(w.name_json, locale) }))}
+                pins={pins}
+                openLabel={t("network.open_map")}
+              />
+              {pins.some((p) => p.href) && <p className="network-map__hint">{t("network.pin_hint")}</p>}
             </div>
           </div>
         </section>
@@ -686,7 +702,42 @@ const project = (lng: number, lat: number): [number, number] => [(lng - LNG0) * 
 const DOT_STEP = 0.42 * K;
 const DOT_ORIGIN = project(-8.8, 18.8);
 
-function NetworkMap({ nodes }: { nodes: { id: string; lat: number | null; lng: number | null; active: boolean; name: string }[] }) {
+type MapPin = { id: string; lat: number; lng: number; label: string; href: string };
+
+const PIN_GAP = 16; // map units between pins that share a spot, about one pin's width once scaled up on phones
+
+/**
+ * Projects pins onto the map; pins that would overlap (e.g. two distributors in one city) are set side by side.
+ * Pins further south are drawn last, so a pin's head is never covered by the tip of the pin just north of it.
+ */
+function placePins(pins: MapPin[]) {
+  const groups: { at: [number, number]; pins: MapPin[] }[] = [];
+  for (const pin of pins) {
+    const at = project(pin.lng, pin.lat);
+    const near = groups.find((g) => Math.hypot(g.at[0] - at[0], g.at[1] - at[1]) < PIN_GAP);
+    if (near) near.pins.push(pin);
+    else groups.push({ at, pins: [pin] });
+  }
+  return groups.flatMap((g) => {
+    const perRow = Math.min(g.pins.length, 4);
+    return g.pins.map((pin, i) => {
+      const row = Math.floor(i / perRow);
+      const inRow = Math.min(perRow, g.pins.length - row * perRow);
+      const col = i % perRow;
+      return { ...pin, x: g.at[0] + (col - (inRow - 1) / 2) * PIN_GAP, y: g.at[1] + row * PIN_GAP * 1.4 };
+    });
+  }).sort((a, b) => a.y - b.y);
+}
+
+function NetworkMap({
+  nodes,
+  pins = [],
+  openLabel = "",
+}: {
+  nodes: { id: string; lat: number | null; lng: number | null; active: boolean; name: string }[];
+  pins?: MapPin[];
+  openLabel?: string;
+}) {
   const pts = nodes.filter((n) => n.lat != null && n.lng != null).map((n) => ({ ...n, p: project(n.lng!, n.lat!) }));
   const links = new Set<string>();
   const lines: [number, number, number, number][] = [];
@@ -707,7 +758,12 @@ function NetworkMap({ nodes }: { nodes: { id: string; lat: number | null; lng: n
   const h = (LAT1 - 18.6) * K;
   const outline = ALGERIA_OUTLINE.map(([lng, lat]) => project(lng, lat).join(",")).join(" ");
   return (
-    <svg className="network-map" viewBox={`0 0 ${w.toFixed(0)} ${h.toFixed(0)}`} role="img" aria-label="Algeria network">
+    <svg
+      className="network-map"
+      viewBox={`0 0 ${w.toFixed(0)} ${h.toFixed(0)}`}
+      role={pins.some((p) => p.href) ? undefined : "img"}
+      aria-label="Algeria network"
+    >
       <defs>
         <radialGradient id="nm-glow" cx="50%" cy="20%" r="70%">
           <stop offset="0%" stopColor="#1d5bd8" stopOpacity="0.35" />
@@ -737,6 +793,28 @@ function NetworkMap({ nodes }: { nodes: { id: string; lat: number | null; lng: n
           <circle className={`node${n.active ? " node--active" : ""}`} cx={n.p[0]} cy={n.p[1]} r={n.active ? 3.2 : 2.2} />
         </g>
       ))}
+      {placePins(pins).map((p) => {
+        const body = (
+          <g className="pin__body">
+            <title>{p.label}</title>
+            <circle className="pin__glow" r={4} />
+            <circle className="pin__hit" cy={-10} r={8.5} />
+            <path className="pin__mark" d="M0 0C-1.6-3.6-6-6.4-6-10.6a6 6 0 1 1 12 0C6-6.4 1.6-3.6 0 0Z" />
+            <circle className="pin__dot" cy={-10.6} r={2.3} />
+          </g>
+        );
+        return (
+          <g key={p.id} transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
+            {p.href ? (
+              <a className="pin" href={p.href} target="_blank" rel="noopener noreferrer" aria-label={`${p.label} (${openLabel})`}>
+                {body}
+              </a>
+            ) : (
+              <g className="pin pin--static">{body}</g>
+            )}
+          </g>
+        );
+      })}
     </svg>
   );
 }
