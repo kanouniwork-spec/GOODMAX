@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/auth/session";
-import { db, newId } from "@/lib/data";
+import { backend, db, newId } from "@/lib/data";
 import type { ActionResult } from "./actions";
-import { addAlias, addUser, disconnect, getConnection, listAccounts, listUsers, replyMessage, sendMessage, type Outgoing } from "@/lib/zoho/mail";
+import { addAlias, addUser, disconnect, getConnection, listAccounts, listUsers, replyMessage, sendMessage, type AttachmentRef, type Outgoing } from "@/lib/zoho/mail";
+import { uploadSlot } from "@/lib/zoho/uploads";
 
 const ok = <T,>(data?: T): ActionResult<T> => ({ ok: true, data });
 const fail = (e: unknown): ActionResult<never> => ({ ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -35,7 +36,17 @@ function addressList(value: string | undefined, label: string, required = false)
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const toHtml = (text: string) => `<div style="font-family:Arial,sans-serif;font-size:14px;white-space:pre-wrap">${escapeHtml(text)}</div>`;
 
-type Draft = { from: string; to: string; cc?: string; bcc?: string; subject: string; body: string };
+type Draft = { from: string; to: string; cc?: string; bcc?: string; subject: string; body: string; attachments?: AttachmentRef[] };
+
+const shortText = (v: unknown) => typeof v === "string" && v.length > 0 && v.length <= 500;
+function attachmentList(list: AttachmentRef[] | undefined) {
+  if (!list?.length) return [];
+  if (list.length > 10) throw new Error("At most 10 files per mail.");
+  return list.map((a) => {
+    if (!shortText(a?.storeName) || !shortText(a?.attachmentPath) || !shortText(a?.attachmentName)) throw new Error("An attachment did not finish uploading. Remove it and add it again.");
+    return { storeName: a.storeName, attachmentPath: a.attachmentPath, attachmentName: a.attachmentName };
+  });
+}
 
 /** The account that may send from this address (its own address or one of its aliases). */
 async function prepare(d: Draft): Promise<{ accountId: string; out: Outgoing }> {
@@ -44,11 +55,12 @@ async function prepare(d: Draft): Promise<{ accountId: string; out: Outgoing }> 
   if (!account) throw new Error(`Zoho does not allow sending from ${d.from}.`);
   const subject = d.subject.trim();
   if (subject.length > 300) throw new Error("The subject is too long.");
-  if (!d.body.trim()) throw new Error("Write a message first.");
+  const attachments = attachmentList(d.attachments);
+  if (!d.body.trim() && !attachments.length) throw new Error("Write a message first.");
   if (d.body.length > 100_000) throw new Error("The message is too long.");
   return {
     accountId: account.accountId,
-    out: { from, to: addressList(d.to, "To", true), cc: addressList(d.cc, "Cc"), bcc: addressList(d.bcc, "Bcc"), subject: subject || "(no subject)", html: toHtml(d.body) },
+    out: { from, to: addressList(d.to, "To", true), cc: addressList(d.cc, "Cc"), bcc: addressList(d.bcc, "Bcc"), subject: subject || "(no subject)", html: toHtml(d.body), attachments },
   };
 }
 
@@ -69,7 +81,9 @@ export async function replyMail(messageId: string, d: Draft): Promise<ActionResu
     const user = await authorize("mail.manage");
     if (!/^\d{1,30}$/.test(messageId)) throw new Error("Unknown message.");
     const { accountId, out } = await prepare(d);
-    await replyMessage(accountId, messageId, out);
+    // Zoho's reply call takes no files: with attachments the reply goes out as a new mail with the same subject
+    if (out.attachments?.length) await sendMessage(accountId, out);
+    else await replyMessage(accountId, messageId, out);
     await audit(user.id, "mail.reply", out.to.slice(0, 200));
     return ok();
   } catch (e) {
@@ -134,6 +148,16 @@ export async function disconnectMail(): Promise<ActionResult> {
     await audit(user.id, "mail.disconnect", conn?.email ?? "");
     revalidatePath("/admin/mail");
     return ok();
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Where the browser uploads an attachment too large to pass through Vercel (see lib/zoho/uploads.ts). */
+export async function mailUploadSlot(fileName: string): Promise<ActionResult<{ bucket: string; path: string; token: string } | null>> {
+  try {
+    await authorize("mail.manage");
+    return ok(backend() === "supabase" ? await uploadSlot(fileName) : null);
   } catch (e) {
     return fail(e);
   }

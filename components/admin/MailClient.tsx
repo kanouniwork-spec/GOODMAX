@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { addMailAlias, createMailbox, disconnectMail, replyMail, sendMail } from "@/app/admin/mail-actions";
-import type { MailUser } from "@/lib/zoho/mail";
+import { useEffect, useRef, useState } from "react";
+import { addMailAlias, createMailbox, disconnectMail, mailUploadSlot, replyMail, sendMail } from "@/app/admin/mail-actions";
+import type { AttachmentRef, MailUser } from "@/lib/zoho/mail";
 import { Confirm, useAct } from "./ui";
 
 export function DisconnectMail() {
@@ -21,29 +21,181 @@ export function DisconnectMail() {
 
 type Draft = { from: string; to: string; cc: string; bcc: string; subject: string; body: string };
 
-/** New mail (Write tab) or a reply under an open message. Plain text, sent as simple HTML. */
+/* ---------------- attachments ---------------- */
+
+const MB = 1024 * 1024;
+const MAX_FILE = 20 * MB;
+const MAX_FILES = 10;
+const DIRECT_MAX = 4 * MB; // Vercel refuses request bodies over 4.5 MB; bigger files go through the upload bucket
+const SHRINK_OVER = 3 * MB;
+type Att = { key: string; name: string; size: number; preview?: string; ref?: AttachmentRef; error?: string };
+
+const sizeText = (n: number) => (n >= MB ? `${(n / MB).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+/** Phone photos are often 5–10 MB: above 3 MB they are re-encoded as JPEG, at most 2560 px wide or high. */
+async function shrinkPhoto(file: File): Promise<File> {
+  if (!/^image\/(jpeg|png|webp|heic|heif)$/.test(file.type) || file.size <= SHRINK_OVER) return file;
+  try {
+    const img = await createImageBitmap(file);
+    const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#fff"; // transparent PNG areas become white, not black
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "photo"}.jpg`, { type: "image/jpeg" });
+  } catch {
+    return file; // a format this browser cannot open (HEIC outside Safari): sent as it is
+  }
+}
+
+async function answer(res: Response): Promise<AttachmentRef> {
+  const json = (await res.json().catch(() => ({}))) as AttachmentRef & { error?: string };
+  if (!res.ok || !json.storeName) throw new Error(json.error || `Upload failed (${res.status})`);
+  return { storeName: json.storeName, attachmentPath: json.attachmentPath, attachmentName: json.attachmentName };
+}
+
+/** Puts one file in Zoho's file store of the sending mailbox (app/api/admin/zoho/attachment). */
+async function uploadToZoho(file: File, from: string): Promise<AttachmentRef> {
+  if (file.size > DIRECT_MAX) {
+    const slot = await mailUploadSlot(file.name);
+    if (!slot.ok) throw new Error(slot.error);
+    if (slot.data) {
+      const { createClient } = await import("@supabase/supabase-js"); // only when a file is too big for a direct upload
+      const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
+      const up = await sb.storage.from(slot.data.bucket).uploadToSignedUrl(slot.data.path, slot.data.token, file, { contentType: file.type || "application/octet-stream" });
+      if (up.error) throw new Error(up.error.message);
+      return answer(await fetch("/api/admin/zoho/attachment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from, path: slot.data.path, name: file.name }) }));
+    }
+  }
+  const form = new FormData();
+  form.append("from", from);
+  form.append("file", file);
+  return answer(await fetch("/api/admin/zoho/attachment", { method: "POST", body: form }));
+}
+
+function useAttachments(from: string) {
+  const [atts, setAtts] = useState<Att[]>([]);
+  const live = useRef(atts);
+  live.current = atts;
+  useEffect(() => () => live.current.forEach((a) => a.preview && URL.revokeObjectURL(a.preview)), []);
+  const patch = (key: string, p: Partial<Att>) => setAtts((list) => list.map((a) => (a.key === key ? { ...a, ...p } : a)));
+  const add = (files: FileList | File[]) => {
+    const room = MAX_FILES - live.current.length;
+    [...files].slice(0, Math.max(0, room)).forEach(async (original) => {
+      const key = `${Date.now()}-${Math.random()}`;
+      const preview = original.type.startsWith("image/") ? URL.createObjectURL(original) : undefined;
+      setAtts((list) => [...list, { key, name: original.name, size: original.size, preview }]);
+      try {
+        const file = await shrinkPhoto(original);
+        if (file.size > MAX_FILE) throw new Error("Larger than 20 MB");
+        patch(key, { name: file.name, size: file.size });
+        patch(key, { ref: await uploadToZoho(file, from) });
+      } catch (e) {
+        patch(key, { error: e instanceof Error ? e.message : String(e) });
+      }
+    });
+  };
+  const remove = (key: string) =>
+    setAtts((list) =>
+      list.filter((a) => {
+        if (a.key === key && a.preview) URL.revokeObjectURL(a.preview);
+        return a.key !== key;
+      }),
+    );
+  const clear = () => {
+    live.current.forEach((a) => a.preview && URL.revokeObjectURL(a.preview));
+    setAtts([]);
+  };
+  return { atts, add, remove, clear, uploading: atts.some((a) => !a.ref && !a.error), full: atts.length >= MAX_FILES };
+}
+
+function AttachmentPicker({ files, id }: { files: ReturnType<typeof useAttachments>; id: string }) {
+  const anyFile = useRef<HTMLInputElement>(null);
+  const photo = useRef<HTMLInputElement>(null);
+  const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) files.add(e.target.files);
+    e.target.value = "";
+  };
+  return (
+    <div className="mail-attach">
+      <div className="a-actions">
+        <button type="button" className="a-btn a-btn--sm" disabled={files.full} onClick={() => anyFile.current?.click()}>
+          + Attach files
+        </button>
+        <button type="button" className="a-btn a-btn--sm" disabled={files.full} onClick={() => photo.current?.click()}>
+          + Add photos
+        </button>
+        <small className="muted">Up to 10 files, 20 MB each. You can also drop files here.</small>
+        <input ref={anyFile} id={`${id}-files`} type="file" multiple hidden onChange={pick} />
+        <input ref={photo} id={`${id}-photos`} type="file" accept="image/*" multiple hidden onChange={pick} />
+      </div>
+      {files.atts.length > 0 && (
+        <ul className="mail-files">
+          {files.atts.map((a) => (
+            <li key={a.key} className={a.error ? "is-error" : undefined}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {a.preview ? <img src={a.preview} alt="" /> : <span className="mail-files__icon">{a.name.split(".").pop()?.slice(0, 4).toUpperCase() || "FILE"}</span>}
+              <span className="mail-files__name" dir="auto">
+                {a.name}
+                <small>{a.error ? a.error : a.ref ? sizeText(a.size) : `${sizeText(a.size)} · uploading…`}</small>
+              </span>
+              <button type="button" className="a-btn a-btn--sm a-btn--ghost" aria-label={`Remove ${a.name}`} onClick={() => files.remove(a.key)}>
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** New mail (Write tab) or a reply under an open message. Plain text, sent as simple HTML, with files and photos. */
 export function MailCompose({ fromOptions, initial, replyTo }: { fromOptions: string[]; initial: Partial<Draft>; replyTo?: string }) {
   const { run, pending } = useAct();
   const blank: Draft = { from: fromOptions[0] ?? "", to: "", cc: "", bcc: "", subject: "", body: "" };
   const [d, setD] = useState<Draft>({ ...blank, ...initial });
   const [copies, setCopies] = useState(!!(initial.cc || initial.bcc));
+  const [dragging, setDragging] = useState(false);
+  const files = useAttachments(d.from);
   const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setD({ ...d, [k]: e.target.value });
   const id = replyTo ? "r" : "w";
+  const ready = files.atts.filter((a) => a.ref).map((a) => a.ref!);
+  const failed = files.atts.some((a) => a.error);
   return (
     <form
-      className="a-card mail-compose"
+      className={`a-card mail-compose${dragging ? " is-dragging" : ""}`}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => e.currentTarget.contains(e.relatedTarget as Node) || setDragging(false)}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        setDragging(false);
+        files.add(e.dataTransfer.files);
+      }}
       onSubmit={(e) => {
         e.preventDefault();
-        run(() => (replyTo ? replyMail(replyTo, d) : sendMail(d)), replyTo ? "Reply sent" : "Mail sent", () =>
-          setD(replyTo ? { ...d, body: "" } : { ...blank, from: d.from }),
-        );
+        const draft = { ...d, attachments: ready };
+        run(() => (replyTo ? replyMail(replyTo, draft) : sendMail(draft)), replyTo ? "Reply sent" : "Mail sent", () => {
+          setD(replyTo ? { ...d, body: "" } : { ...blank, from: d.from });
+          files.clear();
+        });
       }}
     >
       <h2>{replyTo ? "Reply" : "New mail"}</h2>
       <div className="a-row">
         <div className="a-field">
           <label htmlFor={`${id}-from`}>From</label>
-          <select id={`${id}-from`} value={d.from} onChange={set("from")}>
+          <select id={`${id}-from`} value={d.from} onChange={set("from")} disabled={files.atts.length > 0} title={files.atts.length ? "Remove the files to change the sender" : undefined}>
             {fromOptions.map((f) => (
               <option key={f} value={f}>
                 {f}
@@ -78,11 +230,16 @@ export function MailCompose({ fromOptions, initial, replyTo }: { fromOptions: st
       </div>
       <div className="a-field">
         <label htmlFor={`${id}-body`}>Message</label>
-        <textarea id={`${id}-body`} dir="auto" rows={replyTo ? 7 : 12} required value={d.body} onChange={set("body")} />
+        <textarea id={`${id}-body`} dir="auto" rows={replyTo ? 7 : 12} required={!ready.length} value={d.body} onChange={set("body")} />
       </div>
-      <button className="a-btn a-btn--primary" disabled={pending}>
-        {pending ? "Sending…" : replyTo ? "Send reply" : "Send"}
-      </button>
+      <AttachmentPicker files={files} id={id} />
+      {replyTo && files.atts.length > 0 && <p className="muted">With files, the reply goes out as a new mail with the same subject.</p>}
+      <div className="a-actions">
+        <button className="a-btn a-btn--primary" disabled={pending || files.uploading}>
+          {pending ? "Sending…" : files.uploading ? "Uploading files…" : replyTo ? "Send reply" : "Send"}
+        </button>
+        {failed && <span className="muted">Files marked in red will not be sent.</span>}
+      </div>
     </form>
   );
 }

@@ -170,18 +170,20 @@ async function accessToken(conn: ZohoConnection, force: boolean) {
   return refreshing;
 }
 
-async function call<T>(conn: ZohoConnection, path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+type CallInit = { method?: string; body?: unknown; bytes?: Uint8Array; timeout?: number };
+
+async function call<T>(conn: ZohoConnection, path: string, init: CallInit = {}): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`${conn.mailApi}${path}`, {
       method: init.method ?? "GET",
       headers: {
         Authorization: `Zoho-oauthtoken ${await accessToken(conn, attempt > 0)}`,
         Accept: "application/json",
-        ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(init.bytes ? { "Content-Type": "application/octet-stream" } : init.body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
-      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      body: init.bytes ? new Blob([init.bytes as BlobPart]) : init.body !== undefined ? JSON.stringify(init.body) : undefined,
       cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(init.timeout ?? 15_000),
     });
     const json = (await res.json().catch(() => null)) as { status?: { code?: number; description?: string }; data?: unknown } | null;
     if (res.status === 401 && attempt === 0) continue; // the access token ran out early: refresh once
@@ -297,20 +299,69 @@ export async function markRead(accountId: string, messageId: string) {
   await call(await connected(), `/api/accounts/${enc(accountId)}/updatemessage`, { method: "PUT", body: { mode: "markAsRead", messageId: [messageId] } });
 }
 
-export type Outgoing = { from: string; to: string; cc?: string; bcc?: string; subject: string; html: string };
+/** A file already uploaded to Zoho's file store, ready to go with a mail. */
+export type AttachmentRef = { storeName: string; attachmentPath: string; attachmentName: string };
+export type Outgoing = { from: string; to: string; cc?: string; bcc?: string; subject: string; html: string; attachments?: AttachmentRef[] };
+
+const outgoing = (m: Outgoing) => ({
+  fromAddress: m.from,
+  toAddress: m.to,
+  ccAddress: m.cc || undefined,
+  bccAddress: m.bcc || undefined,
+  subject: m.subject,
+  content: m.html,
+  mailFormat: "html",
+});
 
 export async function sendMessage(accountId: string, m: Outgoing) {
   await call(await connected(), `/api/accounts/${enc(accountId)}/messages`, {
     method: "POST",
-    body: { fromAddress: m.from, toAddress: m.to, ccAddress: m.cc || undefined, bccAddress: m.bcc || undefined, subject: m.subject, content: m.html, mailFormat: "html" },
+    body: { ...outgoing(m), attachments: m.attachments?.length ? m.attachments : undefined },
+    timeout: 30_000,
   });
 }
 
+/** Zoho's reply call takes no attachments, so a reply with files is sent as a new mail (see app/admin/mail-actions.ts). */
 export async function replyMessage(accountId: string, messageId: string, m: Outgoing) {
-  await call(await connected(), `/api/accounts/${enc(accountId)}/messages/${enc(messageId)}`, {
-    method: "POST",
-    body: { action: "reply", fromAddress: m.from, toAddress: m.to, ccAddress: m.cc || undefined, bccAddress: m.bcc || undefined, subject: m.subject, content: m.html, mailFormat: "html" },
-  });
+  await call(await connected(), `/api/accounts/${enc(accountId)}/messages/${enc(messageId)}`, { method: "POST", body: { action: "reply", ...outgoing(m) } });
+}
+
+/** Uploads one file to Zoho's file store of this mailbox (https://www.zoho.com/mail/help/api/post-upload-attachments.html). */
+export async function uploadAttachment(accountId: string, fileName: string, bytes: Uint8Array): Promise<AttachmentRef & { size: number }> {
+  const d = await call<{ storeName?: string; attachmentPath?: string; attachmentName?: string; attachmentSize?: string | number } | { storeName?: string; attachmentPath?: string; attachmentName?: string; attachmentSize?: string | number }[]>(
+    await connected(),
+    `/api/accounts/${enc(accountId)}/messages/attachments?${new URLSearchParams({ fileName })}`,
+    { method: "POST", bytes, timeout: 60_000 },
+  );
+  const a = Array.isArray(d) ? d[0] : d;
+  if (!a?.storeName || !a.attachmentPath) throw new ZohoError("Zoho did not accept the file.");
+  return { storeName: a.storeName, attachmentPath: a.attachmentPath, attachmentName: a.attachmentName || fileName, size: Number(a.attachmentSize ?? bytes.length) };
+}
+
+export type MailFile = { attachmentId: string; name: string; size: number };
+
+export async function attachmentInfo(accountId: string, folderId: string, messageId: string): Promise<MailFile[]> {
+  const d = await call<{ attachments?: { attachmentId?: string | number; attachmentName?: string; attachmentSize?: string | number }[] }>(
+    await connected(),
+    `/api/accounts/${enc(accountId)}/folders/${enc(folderId)}/messages/${enc(messageId)}/attachmentinfo`,
+  );
+  return (d?.attachments ?? []).map((a) => ({ attachmentId: str(a.attachmentId), name: decode(str(a.attachmentName)) || "attachment", size: Number(a.attachmentSize ?? 0) }));
+}
+
+/** The file of a received mail, as Zoho streams it. */
+export async function downloadAttachment(accountId: string, folderId: string, messageId: string, attachmentId: string) {
+  const conn = await connected();
+  const path = `/api/accounts/${enc(accountId)}/folders/${enc(folderId)}/messages/${enc(messageId)}/attachments/${enc(attachmentId)}`;
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${conn.mailApi}${path}`, {
+      headers: { Authorization: `Zoho-oauthtoken ${await accessToken(conn, attempt > 0)}`, Accept: "application/octet-stream" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (res.status === 401 && attempt === 0) continue;
+    if (!res.ok || !res.body) throw new ZohoError(`Zoho Mail: the file could not be downloaded (error ${res.status}).`, res.status === 401 ? "auth" : "api");
+    return res;
+  }
 }
 
 /* ---------------- addresses (organisation users and aliases) ---------------- */

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { getConnection, listAccounts, markRead, messageContent, messageDetails } from "@/lib/zoho/mail";
+import { attachmentInfo, getConnection, listAccounts, markRead, messageContent, messageDetails, type MailFile } from "@/lib/zoho/mail";
 import { firstAddress, MailError, MailFrame, mailDate, people } from "@/components/admin/MailFrame";
 import { MailCompose } from "@/components/admin/MailClient";
 
@@ -26,7 +26,13 @@ const frame = (html: string) =>
 async function Message({ account, folder, id }: { account: string; folder: string; id: string }) {
   if (!account || !folder || !id) return <div className="a-alert a-alert--err">This message link is incomplete.</div>;
   try {
-    const [accounts, details, html, conn] = await Promise.all([listAccounts(), messageDetails(account, folder, id), messageContent(account, folder, id), getConnection()]);
+    const [accounts, details, html, conn, files] = await Promise.all([
+      listAccounts(),
+      messageDetails(account, folder, id),
+      messageContent(account, folder, id),
+      getConnection(),
+      attachmentInfo(account, folder, id).catch(() => [] as MailFile[]),
+    ]);
     await markRead(account, id).catch(() => undefined);
     const owner = accounts.find((a) => a.accountId === account);
     const fromOptions = owner?.from ?? [];
@@ -41,7 +47,7 @@ async function Message({ account, folder, id }: { account: string; folder: strin
             ← Back
           </Link>
           <a className="a-btn a-btn--sm a-btn--ghost" href={zohoWeb} target="_blank" rel="noreferrer">
-            Open Zoho Mail (attachments, forwarding)
+            Open Zoho Mail (forwarding)
           </a>
         </div>
         <article className="a-card mail-view">
@@ -63,6 +69,7 @@ async function Message({ account, folder, id }: { account: string; folder: strin
             <dt>Date</dt>
             <dd className="mono">{mailDate(details.time)}</dd>
           </dl>
+          {files.length > 0 && <Files files={files} q={{ account, folder, id }} />}
           <iframe className="mail-body" title="Message" sandbox="allow-popups allow-popups-to-escape-sandbox" srcDoc={frame(html)} />
         </article>
         <div style={{ marginTop: 16 }}>
@@ -73,4 +80,35 @@ async function Message({ account, folder, id }: { account: string; folder: strin
   } catch (e) {
     return <MailError error={e} />;
   }
+}
+
+const PHOTO = /\.(jpe?g|png|gif|webp)$/i;
+const size = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+function Files({ files, q }: { files: MailFile[]; q: { account: string; folder: string; id: string } }) {
+  const href = (f: MailFile, view = false) =>
+    `/api/admin/zoho/file?${new URLSearchParams({ ...q, att: f.attachmentId, name: f.name, ...(view ? { view: "1" } : {}) })}`;
+  return (
+    <ul className="mail-files mail-files--received" aria-label="Attachments">
+      {files.map((f) => (
+        <li key={f.attachmentId}>
+          {PHOTO.test(f.name) ? (
+            <a href={href(f, true)} target="_blank" rel="noreferrer" aria-label={`Open ${f.name}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={href(f, true)} alt="" loading="lazy" />
+            </a>
+          ) : (
+            <span className="mail-files__icon">{f.name.split(".").pop()?.slice(0, 4).toUpperCase() || "FILE"}</span>
+          )}
+          <span className="mail-files__name" dir="auto">
+            {f.name}
+            <small>{f.size ? size(f.size) : ""}</small>
+          </span>
+          <a className="a-btn a-btn--sm" href={href(f)} download={f.name}>
+            Download
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
 }
