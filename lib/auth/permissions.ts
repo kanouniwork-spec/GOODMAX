@@ -6,10 +6,11 @@ export type Permission =
   | "media.write"
   | "requests.write"
   | "settings.write" // site settings, appearance, marketing pixels
-  | "users.manage";
+  | "users.manage"
+  | "mail.manage"; // the company mailboxes (Admin › Mail), through Zoho Mail
 
 const MATRIX: Record<Role, Permission[]> = {
-  admin: ["read", "content.write", "media.write", "requests.write", "settings.write", "users.manage"],
+  admin: ["read", "content.write", "media.write", "requests.write", "settings.write", "users.manage", "mail.manage"],
   editor: ["read", "content.write", "media.write", "requests.write"],
   viewer: ["read"],
 };
@@ -17,7 +18,7 @@ const MATRIX: Record<Role, Permission[]> = {
 export const can = (role: Role | undefined, p: Permission) => !!role && MATRIX[role].includes(p);
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  admin: "Full access, including users, site settings, appearance and marketing pixels.",
+  admin: "Full access, including users, company mail, site settings, appearance and marketing pixels.",
   editor: "Edits content, products, brands, translations, SEO, media and requests.",
   viewer: "Read-only access to the admin.",
 };

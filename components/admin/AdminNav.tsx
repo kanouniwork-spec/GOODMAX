@@ -10,6 +10,7 @@ const ITEMS: { href: string; label: string; adminOnly?: boolean }[] = [
   { href: "/admin/brands", label: "Brands" },
   { href: "/admin/products", label: "Products" },
   { href: "/admin/requests", label: "Distributor Requests" },
+  { href: "/admin/mail", label: "Mail", adminOnly: true },
   { href: "/admin/media", label: "Media Library" },
   { href: "/admin/socials", label: "Social Links" },
   { href: "/admin/locations", label: "Locations & Maps" },
